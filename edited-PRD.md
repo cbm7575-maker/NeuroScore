@@ -56,16 +56,7 @@ Accessible only after selecting and editing a hook. The LLM takes the selected h
 
 ### Pipeline Stages
 
-#### Stage 1 — Onboarding
-
-**Purpose:** Set up user profile and establish neural baselines.
-
-- Collect the user's content niche (comedy, education, lifestyle, fitness, finance, etc.).
-- Run pre-selected baseline calibration videos through TRIBE v2. These are short, neutral clips that establish low-engagement activation across all five networks.
-- Store baseline activation averages per network as the reference for all future scoring.
-- Calibration runs once and does not repeat unless manually triggered.
-
-#### Stage 2 — Video Upload (Analysis Tab)
+#### Stage 1 — Video Upload (Analysis Tab)
 
 **Purpose:** Accept and validate the creator's video.
 
@@ -74,7 +65,7 @@ Accessible only after selecting and editing a hook. The LLM takes the selected h
 - Queue for TRIBE v2 processing.
 - Store the uploaded video for later version comparison.
 
-#### Stage 3 — TRIBE v2 Inference
+#### Stage 2 — TRIBE v2 Inference
 
 **Purpose:** Generate predicted neural activation data.
 
@@ -83,7 +74,7 @@ Accessible only after selecting and editing a hook. The LLM takes the selected h
 - See [TRIBE v2 documentation](https://github.com/facebookresearch/tribev2) for inference code and API usage.
 - **Output:** Matrix of shape `(T, 20484)` — predicted BOLD fMRI signal intensity per cortical vertex per second. Predictions offset by 5 seconds for hemodynamic delay.
 
-#### Stage 4 — ICA Network Aggregation
+#### Stage 3 — ICA Network Aggregation
 
 **Purpose:** Reduce 20,484-vertex output into five interpretable network signals per timestep.
 
@@ -97,9 +88,9 @@ ICA applied to TRIBE v2's final layer discovers five functional networks:
 
 **Aggregation:** Map each vertex to its ICA-derived network, average within each network per timestep. Output: `(T, 5)`.
 
-#### Stage 5a — Baseline Scoring
+#### Stage 4a — Baseline Scoring
 
-**Purpose:** Grade each network's activation against the onboarding baseline.
+**Purpose:** Grade each network's activation against a stored baseline.
 
 - Compute mean activation per network across full video duration.
 - Compare against baseline means; express as a multiplier (e.g., "2.4x baseline").
@@ -107,7 +98,7 @@ ICA applied to TRIBE v2's final layer discovers five functional networks:
 - Compute composite score as weighted average of five network scores (default: equal 20% weights, adjustable per niche).
 - Store all scores for version comparison.
 
-#### Stage 5b — Timeline Analysis
+#### Stage 4b — Timeline Analysis
 
 **Purpose:** Map second-by-second activation to identify spikes and drop-offs.
 
@@ -117,7 +108,7 @@ ICA applied to TRIBE v2's final layer discovers five functional networks:
 - Output structured timeline: timestamp, activation values per network, spike/drop-off classification, and which networks are affected.
 - Drop-off data is the primary input for the LLM and the improvement funnel.
 
-#### Stage 6 — LLM Interpretation Layer
+#### Stage 5 — LLM Interpretation Layer
 
 **Purpose:** Translate raw scores and timeline data into actionable analysis and power the improvement funnel.
 
@@ -139,7 +130,7 @@ ICA applied to TRIBE v2's final layer discovers five functional networks:
 
 **LLM API:** TBD. Candidates: Claude API, OpenAI API, Kimi K2.5.
 
-#### Stage 7 — Results Output (Analysis Tab Display)
+#### Stage 6 — Results Output (Analysis Tab Display)
 
 - Display composite overall score prominently.
 - Display five network scores with labels.
@@ -149,7 +140,7 @@ ICA applied to TRIBE v2's final layer discovers five functional networks:
 - **"Generate hooks"** button to enter the funnel.
 - **"Re-upload improved version"** action for version comparison.
 
-#### Stage 8 — Version Comparison
+#### Stage 7 — Version Comparison
 
 - Accept re-uploaded video, run through full pipeline.
 - Side-by-side display: overall score delta, per-network score deltas, timeline overlay with v1 drop-off zones highlighted, LLM comparison commentary.
@@ -230,13 +221,12 @@ An interactive 3D brain model on the Analysis tab visualizes predicted cortical 
 
 ## Open Questions
 
-1. **Baseline calibration videos:** Which neutral clips for baseline? Need 3–5 standardized clips (visually bland, no narrative, minimal audio, no emotional content).
-2. **ICA network mapping:** Vertex-to-network mapping must be extracted from the model or reproduced via ICA on model weights.
-3. **LLM API selection:** Claude, OpenAI, or Kimi K2.5. Deferred to development.
-4. **Scoring normalization:** Exact mapping from raw activation multipliers to 0–100 scale needs calibration with real output data.
-5. **Tech stack:** Frontend framework, database, and deployment architecture TBD.
-6. **Processing time:** TRIBE v2 inference time on consumer GPUs needs benchmarking for UX decisions.
-7. **Brain mesh delivery:** fsaverage5 mesh needs export to web-friendly format (glTF, OBJ, or raw arrays for Three.js).
+1. **ICA network mapping:** Vertex-to-network mapping must be extracted from the model or reproduced via ICA on model weights.
+2. **LLM API selection:** Claude, OpenAI, or Kimi K2.5. Deferred to development.
+3. **Scoring normalization:** Exact mapping from raw activation multipliers to 0–100 scale needs calibration with real output data.
+4. **Tech stack:** Frontend framework, database, and deployment architecture TBD.
+5. **Processing time:** TRIBE v2 inference time on consumer GPUs needs benchmarking for UX decisions.
+6. **Brain mesh delivery:** fsaverage5 mesh needs export to web-friendly format (glTF, OBJ, or raw arrays for Three.js).
 
 ---
 
