@@ -14,9 +14,15 @@ export default function Home() {
     null
   );
   const [showReupload, setShowReupload] = useState(false);
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
 
   const handleGenerateHooks = () => {
     setActiveTab("hooks");
+  };
+
+  const handleGenerateScript = (hookText: string) => {
+    setSelectedHook(hookText);
+    setActiveTab("script");
   };
 
   const handleReupload = () => {
@@ -27,6 +33,7 @@ export default function Home() {
     setVideoId(newVideoId);
     setShowReupload(false);
     setAnalysisResult(null);
+    setSelectedHook(null);
   };
 
   const handleCancelReupload = () => {
@@ -39,7 +46,7 @@ export default function Home() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         hooksEnabled={analysisResult !== null}
-        scriptEnabled={false}
+        scriptEnabled={selectedHook !== null}
       />
 
       {activeTab === "analysis" && (
@@ -96,7 +103,38 @@ export default function Home() {
       )}
 
       {activeTab === "hooks" && analysisResult && videoId && (
-        <HooksTab videoId={videoId} analysisResult={analysisResult} />
+        <HooksTab
+          videoId={videoId}
+          analysisResult={analysisResult}
+          onGenerateScript={handleGenerateScript}
+        />
+      )}
+
+      {activeTab === "script" && selectedHook && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Generate Script
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Generating a full script from your selected hook
+            </p>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+              Selected Hook
+            </h3>
+            <p className="text-sm leading-relaxed text-[var(--text-primary)]">
+              {selectedHook}
+            </p>
+          </div>
+          <div className="flex flex-col items-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--bg-tertiary)] border-t-[var(--accent)]" />
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">
+              Generating script...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

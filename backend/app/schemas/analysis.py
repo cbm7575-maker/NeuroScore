@@ -71,3 +71,25 @@ class AnalysisResponse(BaseModel):
     timeline: list[TimelinePoint] = []
     spikes: list[SpikeEvent] = []
     drop_offs: list[DropOffEvent] = []
+
+
+class HookOption(BaseModel):
+    hook_text: str
+    target_networks: list[str]
+    neural_weaknesses_addressed: list[str]
+    preserved_elements: list[str]
+    explanation: str
+
+
+class HookGenerationRequest(BaseModel):
+    niche: str = "general"
+    current_hook: str | None = None
+
+
+class HookGenerationResponse(BaseModel):
+    success: bool
+    video_id: str
+    hooks: list[HookOption]
+    opening_scores: dict[str, float]
+    neural_weaknesses: list[str]
+    neural_strengths: list[str]

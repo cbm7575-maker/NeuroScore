@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers.analysis import router as analysis_router
+from app.routers.hooks import router as hooks_router
 from app.routers.inference import router as inference_router
 from app.routers.videos import router as videos_router
 
@@ -27,3 +28,4 @@ app.add_middleware(
 app.include_router(videos_router)
 app.include_router(inference_router)
 app.include_router(analysis_router)
+app.include_router(hooks_router)

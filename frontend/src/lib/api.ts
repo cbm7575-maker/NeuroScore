@@ -143,3 +143,37 @@ export async function getAnalysis(videoId: string): Promise<AnalysisResponse> {
   if (!res.ok) throw new Error("No analysis found for this video");
   return res.json();
 }
+
+export interface HookOption {
+  hook_text: string;
+  target_networks: string[];
+  neural_weaknesses_addressed: string[];
+  preserved_elements: string[];
+  explanation: string;
+}
+
+export interface HookGenerationResponse {
+  success: boolean;
+  video_id: string;
+  hooks: HookOption[];
+  opening_scores: Record<string, number>;
+  neural_weaknesses: string[];
+  neural_strengths: string[];
+}
+
+export async function generateHooks(
+  videoId: string,
+  niche: string = "general",
+  currentHook?: string
+): Promise<HookGenerationResponse> {
+  const res = await fetch(`${API_BASE}/hooks/${videoId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ niche, current_hook: currentHook || null }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Hook generation failed");
+  }
+  return res.json();
+}
