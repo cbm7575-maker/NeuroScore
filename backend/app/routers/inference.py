@@ -1,11 +1,15 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exceptions import GPUOutOfMemoryError, MissingTokenError, VideoFormatError
 from app.schemas.inference import InferenceJob, InferenceResponse, PredictionMetadata
 from app.services.inference import load_inference_metadata
 from app.services.jobs import get_job, get_job_for_video, submit_inference
 from app.services.video import get_video_path, load_metadata
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/inference", tags=["inference"])
 
@@ -36,7 +40,24 @@ async def run_video_inference(video_id: UUID, force: bool = Query(default=False)
     if video_path is None:
         raise HTTPException(status_code=404, detail="Video file not found")
 
-    job = submit_inference(video_path, video_id)
+    try:
+        job = submit_inference(video_path, video_id)
+    except MissingTokenError as exc:
+        logger.error("Inference blocked by missing token: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+    except VideoFormatError as exc:
+        logger.warning("Video format error for %s: %s", video_id, exc)
+        raise HTTPException(status_code=422, detail=str(exc))
+    except GPUOutOfMemoryError as exc:
+        logger.error("GPU OOM for video %s: %s", video_id, exc)
+        raise HTTPException(status_code=507, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Unexpected error submitting inference for %s", video_id)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred. Please try again later.",
+        )
+
     return job
 
 

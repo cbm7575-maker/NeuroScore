@@ -7,10 +7,12 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
+from app.exceptions import GPUOutOfMemoryError, MissingTokenError, VideoFormatError
 from app.schemas.inference import JobStatus
 from app.services.inference import (
     NUM_VERTICES,
     _apply_hemodynamic_delay,
+    _validate_video,
     load_inference_metadata,
     load_prediction,
 )
@@ -43,6 +45,133 @@ class TestHemodynamicDelay:
         preds = np.ones((5, 3))
         result = _apply_hemodynamic_delay(preds, -1)
         np.testing.assert_array_equal(result, preds)
+
+
+class TestVideoValidation:
+    def test_missing_file_raises(self, tmp_path):
+        fake_path = tmp_path / "nonexistent.mp4"
+        with pytest.raises(VideoFormatError, match="not found"):
+            _validate_video(fake_path)
+
+    def test_unsupported_extension_raises(self, tmp_path):
+        bad_file = tmp_path / "video.mkv"
+        bad_file.write_bytes(b"fake")
+        with pytest.raises(VideoFormatError, match="Unsupported video format"):
+            _validate_video(bad_file)
+
+    def test_empty_file_raises(self, tmp_path):
+        empty_file = tmp_path / "video.mp4"
+        empty_file.touch()
+        with pytest.raises(VideoFormatError, match="empty or corrupted"):
+            _validate_video(empty_file)
+
+    def test_valid_file_passes(self, tmp_path):
+        valid_file = tmp_path / "video.mp4"
+        valid_file.write_bytes(b"fake video data")
+        _validate_video(valid_file)
+
+    def test_error_lists_accepted_formats(self, tmp_path):
+        bad_file = tmp_path / "video.flv"
+        bad_file.write_bytes(b"fake")
+        with pytest.raises(VideoFormatError, match="avi.*mov.*mp4.*webm"):
+            _validate_video(bad_file)
+
+
+class TestMissingTokenError:
+    @pytest.fixture(autouse=True)
+    def _reset_model(self):
+        import app.services.inference as inf_mod
+        inf_mod._model = None
+        yield
+        inf_mod._model = None
+
+    def _make_tribev2_mock(self, from_pretrained_fn=None):
+        if from_pretrained_fn is None:
+            from_pretrained_fn = staticmethod(lambda *a, **kw: "model")
+        return type("module", (), {
+            "TribeModel": type("TribeModel", (), {
+                "from_pretrained": from_pretrained_fn,
+            }),
+        })()
+
+    def test_empty_token_raises(self, monkeypatch):
+        import app.services.inference as inf_mod
+
+        monkeypatch.setattr("app.services.inference.settings.hf_token", "")
+        mock_mod = self._make_tribev2_mock()
+        with patch.dict("sys.modules", {"tribev2": mock_mod}):
+            with pytest.raises(MissingTokenError, match="NEUROSCORE_HF_TOKEN"):
+                inf_mod._load_model()
+
+    def test_auth_failure_raises(self, monkeypatch):
+        import app.services.inference as inf_mod
+
+        monkeypatch.setattr("app.services.inference.settings.hf_token", "bad-token")
+        mock_mod = self._make_tribev2_mock(
+            from_pretrained_fn=staticmethod(
+                lambda *a, **kw: (_ for _ in ()).throw(
+                    OSError("401 Unauthorized")
+                )
+            )
+        )
+        with patch.dict("sys.modules", {"tribev2": mock_mod}):
+            with pytest.raises(MissingTokenError, match="authentication failed"):
+                inf_mod._load_model()
+
+
+class TestGPUOutOfMemoryError:
+    def test_cuda_oom_raises(self, tmp_path, monkeypatch):
+        from app.services.inference import run_inference
+
+        monkeypatch.setattr("app.services.inference.settings.hf_token", "valid")
+        video_path = tmp_path / "video.mp4"
+        video_path.write_bytes(b"fake video data")
+
+        mock_model = type("MockModel", (), {
+            "get_events_dataframe": lambda self, path: "events",
+            "predict": lambda self, events: (_ for _ in ()).throw(
+                RuntimeError("CUDA out of memory. Tried to allocate 2 GiB")
+            ),
+        })()
+
+        with patch("app.services.inference._load_model", return_value=mock_model):
+            with pytest.raises(GPUOutOfMemoryError, match="reducing the video length"):
+                run_inference(video_path, uuid4())
+
+    def test_memory_error_raises(self, tmp_path, monkeypatch):
+        from app.services.inference import run_inference
+
+        monkeypatch.setattr("app.services.inference.settings.hf_token", "valid")
+        video_path = tmp_path / "video.mp4"
+        video_path.write_bytes(b"fake video data")
+
+        mock_model = type("MockModel", (), {
+            "get_events_dataframe": lambda self, path: "events",
+            "predict": lambda self, events: (_ for _ in ()).throw(MemoryError()),
+        })()
+
+        with patch("app.services.inference._load_model", return_value=mock_model):
+            with pytest.raises(GPUOutOfMemoryError, match="out of memory"):
+                run_inference(video_path, uuid4())
+
+
+class TestVideoFormatErrorInInference:
+    def test_corrupted_video_raises(self, tmp_path, monkeypatch):
+        from app.services.inference import run_inference
+
+        monkeypatch.setattr("app.services.inference.settings.hf_token", "valid")
+        video_path = tmp_path / "video.mp4"
+        video_path.write_bytes(b"not a real video")
+
+        mock_model = type("MockModel", (), {
+            "get_events_dataframe": lambda self, path: (_ for _ in ()).throw(
+                ValueError("Cannot decode video stream")
+            ),
+        })()
+
+        with patch("app.services.inference._load_model", return_value=mock_model):
+            with pytest.raises(VideoFormatError, match="corrupted"):
+                run_inference(video_path, uuid4())
 
 
 class TestPredictionStorage:
@@ -173,3 +302,51 @@ class TestJobSubmission:
         assert result.status == JobStatus.FAILED
         assert result.error == "GPU OOM"
         assert result.completed_at is not None
+
+    def test_job_captures_missing_token_error(self, tmp_path):
+        video_id = uuid4()
+        video_path = tmp_path / "video.mp4"
+        video_path.touch()
+
+        with patch(
+            "app.services.jobs.run_inference",
+            side_effect=MissingTokenError("Set NEUROSCORE_HF_TOKEN"),
+        ):
+            job = submit_inference(video_path, video_id)
+            result = self._wait_for_job(job.job_id)
+
+        assert result is not None
+        assert result.status == JobStatus.FAILED
+        assert "NEUROSCORE_HF_TOKEN" in result.error
+
+    def test_job_captures_video_format_error(self, tmp_path):
+        video_id = uuid4()
+        video_path = tmp_path / "video.mp4"
+        video_path.touch()
+
+        with patch(
+            "app.services.jobs.run_inference",
+            side_effect=VideoFormatError("Unsupported format"),
+        ):
+            job = submit_inference(video_path, video_id)
+            result = self._wait_for_job(job.job_id)
+
+        assert result is not None
+        assert result.status == JobStatus.FAILED
+        assert "Unsupported format" in result.error
+
+    def test_job_captures_gpu_oom_error(self, tmp_path):
+        video_id = uuid4()
+        video_path = tmp_path / "video.mp4"
+        video_path.touch()
+
+        with patch(
+            "app.services.jobs.run_inference",
+            side_effect=GPUOutOfMemoryError("GPU ran out of memory"),
+        ):
+            job = submit_inference(video_path, video_id)
+            result = self._wait_for_job(job.job_id)
+
+        assert result is not None
+        assert result.status == JobStatus.FAILED
+        assert "out of memory" in result.error
