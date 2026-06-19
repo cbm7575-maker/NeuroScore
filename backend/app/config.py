@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     allowed_extensions: set[str] = {"mp4", "mov", "webm", "avi"}
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    hf_token: str = ""
+    tribe_model_id: str = "facebook/tribev2"
+
     model_config = {"env_prefix": "NEUROSCORE_"}
 
 

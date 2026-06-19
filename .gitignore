@@ -22,6 +22,12 @@ out/
 .env.local
 .env.*.local
 
+# Model cache
+.cache/
+*.pt
+*.bin
+*.safetensors
+
 # IDE
 .vscode/
 .idea/
