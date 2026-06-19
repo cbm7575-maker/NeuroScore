@@ -15,6 +15,31 @@ export interface UploadResponse {
   video: VideoMetadata;
 }
 
+export type NichePreset = "default" | "comedy" | "education" | "fitness" | "custom";
+
+export interface NicheWeights {
+  auditory: number;
+  language: number;
+  visual: number;
+  default_mode: number;
+  motion: number;
+}
+
+export interface NetworkScores {
+  auditory: number;
+  language: number;
+  visual: number;
+  default_mode: number;
+  motion: number;
+}
+
+export interface CompositeScoreResponse {
+  composite_score: number;
+  network_scores: NetworkScores;
+  weights_used: NicheWeights;
+  preset: NichePreset;
+}
+
 const API_BASE = "/api";
 
 export function uploadVideo(
@@ -51,5 +76,25 @@ export function uploadVideo(
 export async function getVideoMetadata(id: string): Promise<VideoMetadata> {
   const res = await fetch(`${API_BASE}/videos/${id}`);
   if (!res.ok) throw new Error("Failed to fetch video metadata");
+  return res.json();
+}
+
+export async function getCompositeScore(
+  videoId: string,
+  preset: NichePreset,
+  customWeights?: NicheWeights
+): Promise<CompositeScoreResponse> {
+  const body: { preset: NichePreset; custom_weights?: NicheWeights } = { preset };
+  if (preset === "custom" && customWeights) body.custom_weights = customWeights;
+
+  const res = await fetch(`${API_BASE}/scores/${videoId}/composite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to calculate score");
+  }
   return res.json();
 }
