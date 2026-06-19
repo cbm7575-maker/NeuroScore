@@ -29,6 +29,7 @@ interface ScoreDisplayProps {
   onGenerateHooks?: () => void;
   onReupload?: () => void;
   onAnalysisComplete?: (result: AnalysisResponse) => void;
+  onNicheChange?: (niche: string) => void;
 }
 
 export default function ScoreDisplay({
@@ -36,6 +37,7 @@ export default function ScoreDisplay({
   onGenerateHooks,
   onReupload,
   onAnalysisComplete,
+  onNicheChange,
 }: ScoreDisplayProps) {
   const [currentNiche, setCurrentNiche] = useState("general");
   const [currentWeights, setCurrentWeights] = useState<NicheWeights>({
@@ -71,6 +73,7 @@ export default function ScoreDisplay({
     (apiNiche: string, weights: NicheWeights) => {
       setCurrentNiche(apiNiche);
       setCurrentWeights(weights);
+      onNicheChange?.(apiNiche);
       if (result) {
         analyze(apiNiche);
       }

@@ -15,6 +15,7 @@ export default function Home() {
   );
   const [showReupload, setShowReupload] = useState(false);
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
+  const [niche, setNiche] = useState("general");
 
   const handleGenerateHooks = () => {
     setActiveTab("hooks");
@@ -71,6 +72,7 @@ export default function Home() {
                 onGenerateHooks={handleGenerateHooks}
                 onReupload={handleReupload}
                 onAnalysisComplete={setAnalysisResult}
+                onNicheChange={setNiche}
               />
             </div>
           )}
@@ -106,6 +108,7 @@ export default function Home() {
         <HooksTab
           videoId={videoId}
           analysisResult={analysisResult}
+          niche={niche}
           onGenerateScript={handleGenerateScript}
         />
       )}
