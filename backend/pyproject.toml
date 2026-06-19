@@ -9,6 +9,14 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pydantic-settings>=2.0",
     "opencv-python-headless>=4.9",
+    "numpy>=1.26",
+    "nilearn>=0.10",
+    "nibabel>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -17,3 +25,6 @@ include = ["app*"]
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
