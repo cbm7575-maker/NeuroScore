@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
+from app.exceptions import LLMAuthenticationError, LLMError, LLMRateLimitError, LLMTimeoutError
 from app.schemas.analysis import AnalysisRequest, AnalysisResponse, AnalysisOutput, NetworkScore
 from app.services.analysis import generate_analysis, load_analysis
 from app.services.inference import load_inference_metadata
@@ -25,8 +26,17 @@ async def run_analysis(video_id: UUID, request: AnalysisRequest | None = None):
 
     try:
         result = await generate_analysis(video_id, niche)
-    except RuntimeError as exc:
-        logger.error("Analysis failed for %s: %s", video_id, exc)
+    except LLMAuthenticationError as exc:
+        logger.error("LLM auth failed for %s: %s", video_id, exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+    except LLMRateLimitError as exc:
+        logger.warning("LLM rate limit for %s: %s", video_id, exc)
+        raise HTTPException(status_code=429, detail=str(exc))
+    except LLMTimeoutError as exc:
+        logger.warning("LLM timeout for %s: %s", video_id, exc)
+        raise HTTPException(status_code=504, detail=str(exc))
+    except LLMError as exc:
+        logger.error("LLM error for %s: %s", video_id, exc)
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
         logger.exception("Unexpected error during analysis for %s", video_id)

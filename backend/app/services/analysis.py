@@ -16,6 +16,7 @@ from app.schemas.analysis import (
     Suggestion,
     TimelinePoint,
 )
+from app.services import llm_client
 from app.services.inference import NUM_VERTICES, load_prediction
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ def build_analysis_prompt(
             for d in drop_offs[:15]
         )
 
-    return f"""You are a neural video performance analyst. Analyze the following brain-response data from a video in the "{niche}" niche.
+    return f"""Analyze the following brain-response data from a video in the "{niche}" niche.
 
 ## Network Scores (overall averages, 0-100 scale)
 {scores_text}
@@ -235,29 +236,6 @@ def parse_analysis_response(response_text: str) -> AnalysisOutput:
     )
 
 
-async def call_llm(prompt: str) -> str:
-    try:
-        import anthropic
-    except ImportError:
-        raise RuntimeError(
-            "anthropic is not installed. Install with: pip install anthropic"
-        )
-
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "Anthropic API key is required. "
-            "Set NEUROSCORE_ANTHROPIC_API_KEY in your environment or .env file."
-        )
-
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    message = await client.messages.create(
-        model=settings.analysis_model,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return message.content[0].text
-
-
 async def generate_analysis(video_id: UUID, niche: str = "general") -> dict:
     predictions = load_prediction(video_id)
     if predictions is None:
@@ -271,7 +249,7 @@ async def generate_analysis(video_id: UUID, niche: str = "general") -> dict:
     prompt = build_analysis_prompt(network_scores, timeline, spikes, drop_offs, niche)
     logger.info("Calling LLM for analysis of video %s", video_id)
 
-    response_text = await call_llm(prompt)
+    response_text = await llm_client.generate(prompt)
     analysis = parse_analysis_response(response_text)
 
     output_dir = settings.upload_dir / str(video_id)
