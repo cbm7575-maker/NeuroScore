@@ -2,14 +2,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.inference import InferenceResponse, PredictionMetadata
-from app.services.inference import load_inference_metadata, run_inference
+from app.schemas.inference import InferenceJob, InferenceResponse, PredictionMetadata
+from app.services.inference import load_inference_metadata
+from app.services.jobs import get_job, get_job_for_video, submit_inference
 from app.services.video import get_video_path, load_metadata
 
 router = APIRouter(prefix="/api/inference", tags=["inference"])
 
 
-@router.post("/{video_id}", response_model=InferenceResponse)
+@router.post("/{video_id}", response_model=InferenceJob)
 async def run_video_inference(video_id: UUID, force: bool = Query(default=False)):
     video_meta = load_metadata(video_id)
     if video_meta is None:
@@ -18,24 +19,55 @@ async def run_video_inference(video_id: UUID, force: bool = Query(default=False)
     if not force:
         existing = load_inference_metadata(video_id)
         if existing is not None:
-            return InferenceResponse(
-                success=True,
+            return InferenceJob(
+                job_id="completed",
+                video_id=video_id,
+                status="completed",
                 prediction=PredictionMetadata(**existing),
+                created_at=existing["created_at"],
+                completed_at=existing["created_at"],
             )
+
+    active = get_job_for_video(video_id)
+    if active is not None:
+        return active
 
     video_path = get_video_path(video_id)
     if video_path is None:
         raise HTTPException(status_code=404, detail="Video file not found")
 
-    try:
-        metadata = run_inference(video_path, video_id)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    job = submit_inference(video_path, video_id)
+    return job
 
-    return InferenceResponse(
-        success=True,
-        prediction=PredictionMetadata(**metadata),
+
+@router.get("/{video_id}/status", response_model=InferenceJob)
+async def get_inference_status(video_id: UUID):
+    active = get_job_for_video(video_id)
+    if active is not None:
+        return active
+
+    existing = load_inference_metadata(video_id)
+    if existing is not None:
+        return InferenceJob(
+            job_id="completed",
+            video_id=video_id,
+            status="completed",
+            prediction=PredictionMetadata(**existing),
+            created_at=existing["created_at"],
+            completed_at=existing["created_at"],
+        )
+
+    raise HTTPException(
+        status_code=404, detail="No inference job found for this video"
     )
+
+
+@router.get("/jobs/{job_id}", response_model=InferenceJob)
+async def get_job_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.get("/{video_id}", response_model=InferenceResponse)
