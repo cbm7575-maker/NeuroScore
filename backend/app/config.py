@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     hf_token: str = ""
     tribe_model_id: str = "facebook/tribev2"
+    hemodynamic_delay_seconds: int = 5
 
     model_config = {"env_prefix": "NEUROSCORE_"}
 
