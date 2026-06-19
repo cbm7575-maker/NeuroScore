@@ -4,7 +4,15 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 
 from app.exceptions import LLMAuthenticationError, LLMError, LLMRateLimitError, LLMTimeoutError
-from app.schemas.analysis import AnalysisRequest, AnalysisResponse, AnalysisOutput, NetworkScore
+from app.schemas.analysis import (
+    AnalysisRequest,
+    AnalysisResponse,
+    AnalysisOutput,
+    DropOffEvent,
+    NetworkScore,
+    SpikeEvent,
+    TimelinePoint,
+)
 from app.services.analysis import generate_analysis, load_analysis
 from app.services.inference import load_inference_metadata
 
@@ -53,6 +61,9 @@ async def run_analysis(video_id: UUID, request: AnalysisRequest | None = None):
         video_id=str(video_id),
         network_scores=result["network_scores"],
         analysis=result["analysis"],
+        timeline=result["timeline"],
+        spikes=result["spikes"],
+        drop_offs=result["drop_offs"],
     )
 
 
@@ -69,4 +80,7 @@ async def get_analysis(video_id: UUID):
         video_id=data["video_id"],
         network_scores=[NetworkScore(**s) for s in data["network_scores"]],
         analysis=AnalysisOutput(**data["analysis"]),
+        timeline=[TimelinePoint(**t) for t in data.get("timeline", [])],
+        spikes=[SpikeEvent(**s) for s in data.get("spikes", [])],
+        drop_offs=[DropOffEvent(**d) for d in data.get("drop_offs", [])],
     )

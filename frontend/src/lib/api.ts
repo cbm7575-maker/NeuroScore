@@ -94,11 +94,32 @@ export interface AnalysisOutput {
   strength_highlights: StrengthHighlight[];
 }
 
+export interface TimelinePoint {
+  timestamp: number;
+  scores: Record<string, number>;
+}
+
+export interface SpikeEvent {
+  timestamp: number;
+  network: string;
+  score: number;
+}
+
+export interface DropOffEvent {
+  timestamp: number;
+  network: string;
+  score: number;
+  duration: number;
+}
+
 export interface AnalysisResponse {
   success: boolean;
   video_id: string;
   network_scores: NetworkScore[];
   analysis: AnalysisOutput;
+  timeline: TimelinePoint[];
+  spikes: SpikeEvent[];
+  drop_offs: DropOffEvent[];
 }
 
 export async function runAnalysis(

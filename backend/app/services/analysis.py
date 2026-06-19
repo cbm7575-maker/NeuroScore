@@ -261,6 +261,9 @@ async def generate_analysis(video_id: UUID, niche: str = "general") -> dict:
                 "niche": niche,
                 "network_scores": [s.model_dump() for s in network_scores],
                 "analysis": analysis.model_dump(),
+                "timeline": [t.model_dump() for t in timeline],
+                "spikes": [s.model_dump() for s in spikes],
+                "drop_offs": [d.model_dump() for d in drop_offs],
             },
             indent=2,
         )
@@ -270,6 +273,9 @@ async def generate_analysis(video_id: UUID, niche: str = "general") -> dict:
     return {
         "network_scores": network_scores,
         "analysis": analysis,
+        "timeline": timeline,
+        "spikes": spikes,
+        "drop_offs": drop_offs,
     }
 
 

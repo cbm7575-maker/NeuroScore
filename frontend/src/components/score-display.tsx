@@ -4,29 +4,24 @@ import { useCallback, useState } from "react";
 import { runAnalysis, type AnalysisResponse, type NetworkScore } from "@/lib/api";
 import CompositeScore from "./composite-score";
 import NetworkScoreCard from "./network-score-card";
+import TimelineChart from "./timeline-chart";
+import AnalysisDisplay from "./analysis-display";
+import NicheSelector, { type NicheWeights } from "./niche-selector";
 
-const NICHE_OPTIONS = [
-  "general",
-  "tech",
-  "fitness",
-  "finance",
-  "education",
-  "entertainment",
-  "gaming",
-  "beauty",
-  "food",
-  "travel",
-  "news",
-  "music",
-  "comedy",
-  "lifestyle",
-  "sports",
-];
-
-function computeComposite(scores: NetworkScore[]): number {
+function computeWeightedComposite(
+  scores: NetworkScore[],
+  weights: NicheWeights
+): number {
   if (scores.length === 0) return 0;
-  const total = scores.reduce((sum, s) => sum + s.score, 0);
-  return total / scores.length;
+  let weighted = 0;
+  let totalWeight = 0;
+  for (const s of scores) {
+    const key = s.name as keyof NicheWeights;
+    const w = weights[key] ?? 0;
+    weighted += s.score * w;
+    totalWeight += w;
+  }
+  return totalWeight > 0 ? weighted / totalWeight : 0;
 }
 
 interface ScoreDisplayProps {
@@ -34,17 +29,20 @@ interface ScoreDisplayProps {
 }
 
 export default function ScoreDisplay({ videoId }: ScoreDisplayProps) {
-  const [niche, setNiche] = useState("general");
+  const [currentNiche, setCurrentNiche] = useState("general");
+  const [currentWeights, setCurrentWeights] = useState<NicheWeights>({
+    visual: 20, auditory: 20, language: 20, motion: 20, default_mode: 20,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
 
   const analyze = useCallback(
-    async (selectedNiche: string) => {
+    async (niche: string) => {
       setError(null);
       setLoading(true);
       try {
-        const res = await runAnalysis(videoId, selectedNiche);
+        const res = await runAnalysis(videoId, niche);
         setResult(res);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Analysis failed");
@@ -56,52 +54,35 @@ export default function ScoreDisplay({ videoId }: ScoreDisplayProps) {
   );
 
   const handleNicheChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const next = e.target.value;
-      setNiche(next);
-      analyze(next);
+    (apiNiche: string, weights: NicheWeights) => {
+      setCurrentNiche(apiNiche);
+      setCurrentWeights(weights);
+      if (result) {
+        analyze(apiNiche);
+      }
     },
-    [analyze]
+    [analyze, result]
   );
 
-  const composite = result ? computeComposite(result.network_scores) : 0;
+  const composite = result
+    ? computeWeightedComposite(result.network_scores, currentWeights)
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* Niche selector + analyze button */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex-1 min-w-[180px]">
-          <label
-            htmlFor="niche-select"
-            className="mb-1.5 block text-sm text-[var(--text-secondary)]"
-          >
-            Content niche
-          </label>
-          <select
-            id="niche-select"
-            value={niche}
-            onChange={handleNicheChange}
-            disabled={loading}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)]"
-          >
-            {NICHE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n.charAt(0).toUpperCase() + n.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Niche selector */}
+      <NicheSelector disabled={loading} onChange={handleNicheChange} />
 
-        {!result && (
-          <button
-            onClick={() => analyze(niche)}
-            disabled={loading}
-            className="rounded-lg bg-[var(--accent)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
-          >
-            {loading ? "Analyzing..." : "Analyze Video"}
-          </button>
-        )}
-      </div>
+      {/* Analyze button */}
+      {!result && (
+        <button
+          onClick={() => analyze(currentNiche)}
+          disabled={loading}
+          className="rounded-lg bg-[var(--accent)] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
+        >
+          {loading ? "Analyzing..." : "Analyze Video"}
+        </button>
+      )}
 
       {/* Error */}
       {error && (
@@ -149,6 +130,23 @@ export default function ScoreDisplay({ videoId }: ScoreDisplayProps) {
                 />
               ))}
             </div>
+          </div>
+
+          {/* Timeline chart */}
+          {result.timeline && result.timeline.length > 0 && (
+            <TimelineChart
+              timeline={result.timeline}
+              spikes={result.spikes || []}
+              dropOffs={result.drop_offs || []}
+            />
+          )}
+
+          {/* LLM Analysis */}
+          <div className="border-t border-[var(--border)] pt-6">
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight">
+              Analysis Results
+            </h2>
+            <AnalysisDisplay analysis={result.analysis} />
           </div>
         </div>
       )}

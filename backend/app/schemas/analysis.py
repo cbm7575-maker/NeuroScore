@@ -68,3 +68,6 @@ class AnalysisResponse(BaseModel):
     video_id: str
     network_scores: list[NetworkScore]
     analysis: AnalysisOutput
+    timeline: list[TimelinePoint] = []
+    spikes: list[SpikeEvent] = []
+    drop_offs: list[DropOffEvent] = []
