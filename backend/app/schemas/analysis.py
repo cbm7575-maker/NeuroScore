@@ -1,0 +1,70 @@
+from pydantic import BaseModel
+
+
+class NetworkScore(BaseModel):
+    name: str
+    score: float
+    label: str
+
+
+class TimelinePoint(BaseModel):
+    timestamp: float
+    scores: dict[str, float]
+
+
+class SpikeEvent(BaseModel):
+    timestamp: float
+    network: str
+    score: float
+
+
+class DropOffEvent(BaseModel):
+    timestamp: float
+    network: str
+    score: float
+    duration: float
+
+
+class NetworkInterpretation(BaseModel):
+    network: str
+    score: float
+    label: str
+    interpretation: str
+
+
+class DropOffDetail(BaseModel):
+    timestamp: float
+    duration: float
+    network: str
+    description: str
+
+
+class Suggestion(BaseModel):
+    timestamp: float | None
+    network: str | None
+    suggestion: str
+
+
+class StrengthHighlight(BaseModel):
+    timestamp: float | None
+    network: str | None
+    description: str
+
+
+class AnalysisOutput(BaseModel):
+    overall_assessment: str
+    network_interpretations: list[NetworkInterpretation]
+    drop_off_analysis: list[DropOffDetail]
+    suggestions: list[Suggestion]
+    strength_highlights: list[StrengthHighlight]
+
+
+class AnalysisRequest(BaseModel):
+    niche: str = "general"
+
+
+class AnalysisResponse(BaseModel):
+    success: bool
+    video_id: str
+    network_scores: list[NetworkScore]
+    analysis: AnalysisOutput

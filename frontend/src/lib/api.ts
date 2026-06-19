@@ -53,3 +53,72 @@ export async function getVideoMetadata(id: string): Promise<VideoMetadata> {
   if (!res.ok) throw new Error("Failed to fetch video metadata");
   return res.json();
 }
+
+export interface NetworkScore {
+  name: string;
+  score: number;
+  label: string;
+}
+
+export interface NetworkInterpretation {
+  network: string;
+  score: number;
+  label: string;
+  interpretation: string;
+}
+
+export interface DropOffDetail {
+  timestamp: number;
+  duration: number;
+  network: string;
+  description: string;
+}
+
+export interface Suggestion {
+  timestamp: number | null;
+  network: string | null;
+  suggestion: string;
+}
+
+export interface StrengthHighlight {
+  timestamp: number | null;
+  network: string | null;
+  description: string;
+}
+
+export interface AnalysisOutput {
+  overall_assessment: string;
+  network_interpretations: NetworkInterpretation[];
+  drop_off_analysis: DropOffDetail[];
+  suggestions: Suggestion[];
+  strength_highlights: StrengthHighlight[];
+}
+
+export interface AnalysisResponse {
+  success: boolean;
+  video_id: string;
+  network_scores: NetworkScore[];
+  analysis: AnalysisOutput;
+}
+
+export async function runAnalysis(
+  videoId: string,
+  niche: string = "general"
+): Promise<AnalysisResponse> {
+  const res = await fetch(`${API_BASE}/analysis/${videoId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ niche }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Analysis failed");
+  }
+  return res.json();
+}
+
+export async function getAnalysis(videoId: string): Promise<AnalysisResponse> {
+  const res = await fetch(`${API_BASE}/analysis/${videoId}`);
+  if (!res.ok) throw new Error("No analysis found for this video");
+  return res.json();
+}

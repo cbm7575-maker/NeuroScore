@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     tribe_model_id: str = "facebook/tribev2"
     hemodynamic_delay_seconds: int = 5
 
+    anthropic_api_key: str = ""
+    analysis_model: str = "claude-sonnet-4-20250514"
+
     model_config = {"env_prefix": "NEUROSCORE_"}
 
 
