@@ -23,7 +23,11 @@ function getExtension(filename: string): string {
   return filename.split(".").pop()?.toLowerCase() ?? "";
 }
 
-export default function VideoUpload() {
+interface VideoUploadProps {
+  onUploadComplete?: (videoId: string) => void;
+}
+
+export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -49,6 +53,7 @@ export default function VideoUpload() {
     try {
       const response = await uploadVideo(file, setProgress);
       setMetadata(response.video);
+      onUploadComplete?.(response.video.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {

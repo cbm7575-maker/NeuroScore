@@ -11,6 +11,11 @@
   --accent-hover: #818cf8;
   --success: #22c55e;
   --error: #ef4444;
+  --score-excellent: #6366f1;
+  --score-good: #22c55e;
+  --score-average: #eab308;
+  --score-below: #f97316;
+  --score-poor: #ef4444;
 }
 
 body {
