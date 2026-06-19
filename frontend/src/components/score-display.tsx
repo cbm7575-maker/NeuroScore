@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { runAnalysis, type AnalysisResponse, type NetworkScore } from "@/lib/api";
 import CompositeScore from "./composite-score";
 import NetworkScoreCard from "./network-score-card";
-import TimelineChart from "./timeline-chart";
 import AnalysisDisplay from "./analysis-display";
 import NicheSelector, { type NicheWeights } from "./niche-selector";
+import BrainVideoSync, { type BrainVideoSyncHandle } from "./brain-video-sync";
 
 function computeWeightedComposite(
   scores: NetworkScore[],
@@ -44,6 +44,11 @@ export default function ScoreDisplay({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const syncRef = useRef<BrainVideoSyncHandle>(null);
+
+  const handleTimestampClick = useCallback((time: number) => {
+    syncRef.current?.seekTo(time);
+  }, []);
 
   const analyze = useCallback(
     async (niche: string) => {
@@ -141,13 +146,20 @@ export default function ScoreDisplay({
             </div>
           </div>
 
-          {/* Timeline chart */}
+          {/* 3D Brain + Video Player + Timeline */}
           {result.timeline && result.timeline.length > 0 && (
-            <TimelineChart
-              timeline={result.timeline}
-              spikes={result.spikes || []}
-              dropOffs={result.drop_offs || []}
-            />
+            <div>
+              <h3 className="mb-3 text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                Brain Visualization
+              </h3>
+              <BrainVideoSync
+                ref={syncRef}
+                videoId={videoId}
+                timeline={result.timeline}
+                spikes={result.spikes || []}
+                dropOffs={result.drop_offs || []}
+              />
+            </div>
           )}
 
           {/* LLM Analysis */}
@@ -155,7 +167,10 @@ export default function ScoreDisplay({
             <h2 className="mb-4 text-2xl font-semibold tracking-tight">
               Analysis Results
             </h2>
-            <AnalysisDisplay analysis={result.analysis} />
+            <AnalysisDisplay
+              analysis={result.analysis}
+              onTimestampClick={handleTimestampClick}
+            />
           </div>
 
           {/* Funnel actions */}

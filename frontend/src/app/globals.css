@@ -23,3 +23,22 @@ body {
   color: var(--text-primary);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
+
+.video-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg-secondary);
+}
+
+.video-seek::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg-secondary);
+}
