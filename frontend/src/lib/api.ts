@@ -40,6 +40,24 @@ export interface CompositeScoreResponse {
   preset: NichePreset;
 }
 
+export interface BrainHemisphere {
+  coords: [number, number, number][];
+  faces: [number, number, number][];
+  network_map: number[];
+}
+
+export interface BrainSurfaceData {
+  left: BrainHemisphere;
+  right: BrainHemisphere;
+}
+
+export interface VertexColorsData {
+  video_id: string;
+  duration_seconds: number;
+  network_stats: Record<string, { min: number; max: number }>;
+  activations: number[][];  // T × 5, one row per second
+}
+
 const API_BASE = "/api";
 
 export function uploadVideo(
@@ -71,6 +89,22 @@ export function uploadVideo(
     xhr.open("POST", `${API_BASE}/videos/upload`);
     xhr.send(formData);
   });
+}
+
+let _surfaceCache: BrainSurfaceData | null = null;
+
+export async function getBrainSurface(): Promise<BrainSurfaceData> {
+  if (_surfaceCache) return _surfaceCache;
+  const res = await fetch(`${API_BASE}/brain/surface`);
+  if (!res.ok) throw new Error("Failed to load brain surface");
+  _surfaceCache = await res.json();
+  return _surfaceCache!;
+}
+
+export async function getVertexColors(videoId: string): Promise<VertexColorsData> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/vertex-colors`);
+  if (!res.ok) throw new Error("Failed to load vertex colors");
+  return res.json();
 }
 
 export async function getVideoMetadata(id: string): Promise<VideoMetadata> {

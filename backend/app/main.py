@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.routers.brain import router as brain_router
 from app.routers.scores import router as scores_router
 from app.routers.timeline import router as timeline_router
 from app.routers.videos import router as videos_router
@@ -27,3 +28,4 @@ app.add_middleware(
 app.include_router(videos_router)
 app.include_router(scores_router)
 app.include_router(timeline_router)
+app.include_router(brain_router)

@@ -7,6 +7,7 @@ import {
   type NichePreset,
   type NicheWeights,
 } from "@/lib/api";
+import BrainViewer from "./brain-viewer";
 
 const PRESET_LABELS: Record<NichePreset, string> = {
   default: "Default",
@@ -200,6 +201,11 @@ export default function NicheSelector({ videoId }: Props) {
                 </div>
               );
             })}
+          </div>
+
+          {/* 3D brain activity map */}
+          <div className="pt-2">
+            <BrainViewer networkScores={result.network_scores} />
           </div>
         </div>
       )}
