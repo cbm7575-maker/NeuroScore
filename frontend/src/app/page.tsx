@@ -37,12 +37,15 @@ export default function Home() {
     setShowReupload(true);
   };
 
+  const [isReupload, setIsReupload] = useState(false);
+
   const handleReuploadComplete = (newVideoId: string) => {
     setVideoId(newVideoId);
     setShowReupload(false);
     setAnalysisResult(null);
     setSelectedHook(null);
     setAutoAnalyze(true);
+    setIsReupload(true);
   };
 
   const handleCancelReupload = () => {
@@ -72,9 +75,16 @@ export default function Home() {
           {videoId && (
             <div>
               <div className="mb-6 border-t border-[var(--border)]" />
-              <h2 className="mb-4 text-2xl font-semibold tracking-tight">
-                Neural Engagement Scores
-              </h2>
+              <div className="mb-4 flex items-center gap-3">
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  Neural Engagement Scores
+                </h2>
+                {isReupload && (
+                  <span className="rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 text-xs font-semibold text-[var(--accent)]">
+                    Improved Version
+                  </span>
+                )}
+              </div>
               <ScoreDisplay
                 key={videoId}
                 videoId={videoId}

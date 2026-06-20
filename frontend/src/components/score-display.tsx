@@ -69,8 +69,28 @@ export default function ScoreDisplay({
   const [v1Timeline, setV1Timeline] = useState<TimelinePoint[] | null>(null);
   const [comparison, setComparison] = useState<ComparisonOutput | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [videoVersion, setVideoVersion] = useState<number>(1);
+  const [originalVideoId, setOriginalVideoId] = useState<string | null>(null);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
   const autoAnalyzedRef = useRef(false);
+
+  const isReupload = videoVersion >= 2;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const meta = await getVideoMetadata(videoId);
+        if (!cancelled) {
+          setVideoVersion(meta.version);
+          setOriginalVideoId(meta.original_video_id);
+        }
+      } catch {
+        // metadata may not be available yet
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [videoId]);
 
   const handleTimestampClick = useCallback((time: number) => {
     syncRef.current?.seekTo(time);
@@ -122,32 +142,36 @@ export default function ScoreDisplay({
   );
 
   useEffect(() => {
-    if (!result) return;
+    if (!result || !originalVideoId) return;
     let cancelled = false;
     (async () => {
+      let hasV1Analysis = false;
       try {
-        const meta = await getVideoMetadata(videoId);
-        if (cancelled || !meta.original_video_id) return;
-        const v1Analysis = await getAnalysis(meta.original_video_id);
+        const v1Analysis = await getAnalysis(originalVideoId);
         if (!cancelled) {
           setV1Scores(v1Analysis.network_scores);
           setV1DropOffs(v1Analysis.drop_offs || []);
           setV1Timeline(v1Analysis.timeline || []);
+          hasV1Analysis = true;
         }
+      } catch {
+        // v1 analysis may not exist yet (first re-upload)
+      }
 
+      if (hasV1Analysis && !cancelled) {
         setComparisonLoading(true);
         try {
           const compRes = await runComparison(videoId);
           if (!cancelled) setComparison(compRes.comparison);
+        } catch {
+          // comparison generation may fail
         } finally {
           if (!cancelled) setComparisonLoading(false);
         }
-      } catch {
-        // v1 analysis may not exist
       }
     })();
     return () => { cancelled = true; };
-  }, [result, videoId]);
+  }, [result, videoId, originalVideoId]);
 
   const composite = result
     ? computeWeightedComposite(result.network_scores, currentWeights)
@@ -198,20 +222,48 @@ export default function ScoreDisplay({
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--bg-tertiary)] border-t-[var(--accent)]" />
           <p className="mt-4 text-sm text-[var(--text-secondary)]">
             {pipelineStage === "inference"
-              ? "Running neural inference (TRIBE v2)..."
-              : "Running neural engagement analysis..."}
+              ? isReupload
+                ? "Running neural inference on improved version..."
+                : "Running neural inference (TRIBE v2)..."
+              : isReupload
+                ? "Analyzing improved version..."
+                : "Running neural engagement analysis..."}
           </p>
+          {isReupload && (
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Comparison with original will appear once complete
+            </p>
+          )}
         </div>
       )}
 
       {/* Scores */}
       {result && (
         <div className="space-y-6">
+          {/* Version banner for re-uploads */}
+          {isReupload && (
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-4 py-3">
+              <span className="rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 text-xs font-semibold text-[var(--accent)]">
+                v{videoVersion}
+              </span>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Improved version &mdash; scores and comparisons are relative to the original
+              </p>
+            </div>
+          )}
+
           {/* Composite score */}
           <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-8">
-            <h3 className="mb-6 text-center text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-              Overall Neural Engagement
-            </h3>
+            <div className="mb-6 flex items-center justify-center gap-2">
+              <h3 className="text-center text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                Overall Neural Engagement
+              </h3>
+              {isReupload && (
+                <span className="rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                  v{videoVersion}
+                </span>
+              )}
+            </div>
             <CompositeScore
               score={composite}
               label={result.analysis.overall_assessment.slice(0, 80)}
@@ -221,9 +273,16 @@ export default function ScoreDisplay({
 
           {/* Network scores grid */}
           <div>
-            <h3 className="mb-3 text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-              Network Scores
-            </h3>
+            <div className="mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                Network Scores
+              </h3>
+              {isReupload && (
+                <span className="rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                  v{videoVersion}
+                </span>
+              )}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {result.network_scores.map((ns) => (
                 <NetworkScoreCard
@@ -265,6 +324,23 @@ export default function ScoreDisplay({
               onTimestampClick={handleTimestampClick}
             />
           </div>
+
+          {/* First re-upload notice (v1 not analyzed yet) */}
+          {isReupload && !v1Scores && !comparisonLoading && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 text-lg">&#x2139;&#xFE0F;</span>
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                    No original analysis available
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    The original video hasn&apos;t been analyzed yet. Score deltas, brain comparisons, and LLM commentary will appear once the original is also analyzed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Comparison Commentary */}
           {(comparison || comparisonLoading) && (
