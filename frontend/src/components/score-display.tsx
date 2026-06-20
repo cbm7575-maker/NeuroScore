@@ -73,6 +73,7 @@ export default function ScoreDisplay({
     (apiNiche: string, weights: NicheWeights) => {
       setCurrentNiche(apiNiche);
       setCurrentWeights(weights);
+      sessionStorage.setItem("neuroscore_niche", apiNiche);
       onNicheChange?.(apiNiche);
       if (result) {
         analyze(apiNiche);

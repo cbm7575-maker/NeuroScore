@@ -58,6 +58,45 @@ export interface VertexColorsData {
   activations: number[][];  // T × 5, one row per second
 }
 
+export interface TimelineEntry {
+  timestamp: number;
+  activations: {
+    visual: number;
+    auditory: number;
+    language: number;
+    motion: number;
+    default_mode: number;
+  };
+  classifications: {
+    visual: string;
+    auditory: string;
+    language: string;
+    motion: string;
+    default_mode: string;
+  };
+  affected_networks: string[];
+}
+
+export interface ScriptAnnotation {
+  original_text: string;
+  improved_text: string;
+  target_networks: string[];
+  reason: string;
+}
+
+export interface ScriptGenerationRequest {
+  video_id: string;
+  hook: string;
+  transcript: string;
+  niche: NichePreset;
+  timeline: TimelineEntry[];
+}
+
+export interface ScriptGenerationResponse {
+  improved_script: string;
+  annotations: ScriptAnnotation[];
+}
+
 const API_BASE = "/api";
 
 export function uploadVideo(
@@ -253,6 +292,37 @@ export async function getCompositeScore(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Failed to calculate score");
+  }
+  return res.json();
+}
+
+export interface TimelineResult {
+  video_id: string;
+  duration_seconds: number;
+  thresholds: { spike_sd_above: number; drop_sd_below: number; drop_min_duration_seconds: number };
+  timeline: TimelineEntry[];
+}
+
+export async function getTimeline(videoId: string): Promise<TimelineResult> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/timeline`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch timeline");
+  }
+  return res.json();
+}
+
+export async function generateScript(
+  request: ScriptGenerationRequest
+): Promise<ScriptGenerationResponse> {
+  const res = await fetch(`${API_BASE}/scripts/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Script generation failed");
   }
   return res.json();
 }

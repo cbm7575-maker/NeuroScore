@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     analysis_model: str = "claude-sonnet-4-20250514"
+    script_model: str = "claude-sonnet-4-6"
     llm_max_retries: int = 3
     llm_timeout_seconds: float = 120.0
 

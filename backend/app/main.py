@@ -9,6 +9,7 @@ from app.routers.brain import router as brain_router
 from app.routers.hooks import router as hooks_router
 from app.routers.inference import router as inference_router
 from app.routers.scores import router as scores_router
+from app.routers.scripts import router as scripts_router
 from app.routers.timeline import router as timeline_router
 from app.routers.videos import router as videos_router
 
@@ -35,3 +36,4 @@ app.include_router(hooks_router)
 app.include_router(scores_router)
 app.include_router(timeline_router)
 app.include_router(brain_router)
+app.include_router(scripts_router)

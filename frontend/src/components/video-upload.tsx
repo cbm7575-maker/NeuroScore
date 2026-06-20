@@ -54,6 +54,7 @@ export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
     try {
       const response = await uploadVideo(file, setProgress);
       setMetadata(response.video);
+      sessionStorage.setItem("neuroscore_video_id", response.video.id);
       onUploadComplete?.(response.video.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
