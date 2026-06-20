@@ -103,11 +103,19 @@ def resolve_root_video_id(video_id: UUID) -> UUID:
     return meta.original_video_id
 
 
-def compute_next_version(root_video_id: UUID) -> int:
-    max_version = 1
+
+def delete_video_data(video_id: UUID) -> bool:
+    video_dir = settings.upload_dir / str(video_id)
+    if video_dir.exists():
+        shutil.rmtree(video_dir)
+        return True
+    return False
+
+
+def find_existing_reupload(root_video_id: UUID) -> VideoMetadata | None:
     upload_dir = settings.upload_dir
     if not upload_dir.exists():
-        return 2
+        return None
     for d in upload_dir.iterdir():
         if not d.is_dir():
             continue
@@ -115,11 +123,9 @@ def compute_next_version(root_video_id: UUID) -> int:
         if not meta_path.exists():
             continue
         data = json.loads(meta_path.read_text())
-        vid = data.get("id", "")
-        orig = data.get("original_video_id")
-        if vid == str(root_video_id) or orig == str(root_video_id):
-            max_version = max(max_version, data.get("version", 1))
-    return max_version + 1
+        if data.get("original_video_id") == str(root_video_id) and data.get("version", 1) >= 2:
+            return VideoMetadata(**data)
+    return None
 
 
 def list_versions(video_id: UUID) -> list[VideoMetadata]:

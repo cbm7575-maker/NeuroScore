@@ -9,8 +9,9 @@ from app.config import settings
 from app.schemas.brain import NetworkStats, VertexColorsResponse
 from app.schemas.video import UploadResponse, VideoMetadata
 from app.services.video import (
-    compute_next_version,
+    delete_video_data,
     extract_metadata,
+    find_existing_reupload,
     get_video_path,
     list_versions,
     load_metadata,
@@ -52,7 +53,10 @@ async def upload_video(
     root_id: UUID | None = None
     if original_video_id is not None:
         root_id = resolve_root_video_id(original_video_id)
-        version = compute_next_version(root_id)
+        old_v2 = find_existing_reupload(root_id)
+        if old_v2 is not None:
+            delete_video_data(old_v2.id)
+        version = 2
 
     try:
         metadata = extract_metadata(
