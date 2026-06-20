@@ -34,7 +34,14 @@ async def save_upload(file: UploadFile) -> tuple[Path, UUID, str]:
     return video_path, video_id, ext
 
 
-def extract_metadata(video_path: Path, video_id: UUID, original_filename: str, ext: str) -> VideoMetadata:
+def extract_metadata(
+    video_path: Path,
+    video_id: UUID,
+    original_filename: str,
+    ext: str,
+    version: int = 1,
+    original_video_id: UUID | None = None,
+) -> VideoMetadata:
     cap = cv2.VideoCapture(str(video_path))
     try:
         if not cap.isOpened():
@@ -60,6 +67,8 @@ def extract_metadata(video_path: Path, video_id: UUID, original_filename: str, e
         file_size_bytes=file_size,
         format=ext,
         created_at=datetime.now(timezone.utc),
+        version=version,
+        original_video_id=original_video_id,
     )
 
     metadata_path = video_path.parent / "metadata.json"
@@ -85,3 +94,49 @@ def get_video_path(video_id: UUID) -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def resolve_root_video_id(video_id: UUID) -> UUID:
+    meta = load_metadata(video_id)
+    if meta is None or meta.original_video_id is None:
+        return video_id
+    return meta.original_video_id
+
+
+def compute_next_version(root_video_id: UUID) -> int:
+    max_version = 1
+    upload_dir = settings.upload_dir
+    if not upload_dir.exists():
+        return 2
+    for d in upload_dir.iterdir():
+        if not d.is_dir():
+            continue
+        meta_path = d / "metadata.json"
+        if not meta_path.exists():
+            continue
+        data = json.loads(meta_path.read_text())
+        vid = data.get("id", "")
+        orig = data.get("original_video_id")
+        if vid == str(root_video_id) or orig == str(root_video_id):
+            max_version = max(max_version, data.get("version", 1))
+    return max_version + 1
+
+
+def list_versions(video_id: UUID) -> list[VideoMetadata]:
+    root_id = resolve_root_video_id(video_id)
+    versions: list[VideoMetadata] = []
+    upload_dir = settings.upload_dir
+    if not upload_dir.exists():
+        return versions
+    for d in upload_dir.iterdir():
+        if not d.is_dir():
+            continue
+        meta_path = d / "metadata.json"
+        if not meta_path.exists():
+            continue
+        data = json.loads(meta_path.read_text())
+        vid = data.get("id", "")
+        orig = data.get("original_video_id")
+        if vid == str(root_id) or orig == str(root_id):
+            versions.append(VideoMetadata(**data))
+    return sorted(versions, key=lambda m: m.version)

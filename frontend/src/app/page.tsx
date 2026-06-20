@@ -111,7 +111,10 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <VideoUpload onUploadComplete={handleReuploadComplete} />
+              <VideoUpload
+                originalVideoId={videoId ?? undefined}
+                onUploadComplete={handleReuploadComplete}
+              />
             </div>
           )}
         </div>

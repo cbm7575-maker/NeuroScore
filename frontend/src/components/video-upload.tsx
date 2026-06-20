@@ -25,10 +25,11 @@ function getExtension(filename: string): string {
 }
 
 interface VideoUploadProps {
+  originalVideoId?: string;
   onUploadComplete?: (videoId: string) => void;
 }
 
-export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
+export default function VideoUpload({ originalVideoId, onUploadComplete }: VideoUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -52,7 +53,7 @@ export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
     setProgress(0);
 
     try {
-      const response = await uploadVideo(file, setProgress);
+      const response = await uploadVideo(file, setProgress, originalVideoId);
       setMetadata(response.video);
       sessionStorage.setItem("neuroscore_video_id", response.video.id);
       onUploadComplete?.(response.video.id);

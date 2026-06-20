@@ -14,6 +14,8 @@ class VideoMetadata(BaseModel):
     file_size_bytes: int
     format: str
     created_at: datetime
+    version: int = 1
+    original_video_id: UUID | None = None
 
 
 class UploadResponse(BaseModel):

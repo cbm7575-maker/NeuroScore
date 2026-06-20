@@ -8,6 +8,8 @@ export interface VideoMetadata {
   file_size_bytes: number;
   format: string;
   created_at: string;
+  version: number;
+  original_video_id: string | null;
 }
 
 export interface UploadResponse {
@@ -108,12 +110,16 @@ const API_BASE = "/api";
 
 export function uploadVideo(
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  originalVideoId?: string
 ): Promise<UploadResponse> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append("file", file);
+    if (originalVideoId) {
+      formData.append("original_video_id", originalVideoId);
+    }
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable && onProgress) {
@@ -156,6 +162,12 @@ export async function getVertexColors(videoId: string): Promise<VertexColorsData
 export async function getVideoMetadata(id: string): Promise<VideoMetadata> {
   const res = await fetch(`${API_BASE}/videos/${id}`);
   if (!res.ok) throw new Error("Failed to fetch video metadata");
+  return res.json();
+}
+
+export async function getVideoVersions(videoId: string): Promise<VideoMetadata[]> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/versions`);
+  if (!res.ok) throw new Error("Failed to fetch video versions");
   return res.json();
 }
 

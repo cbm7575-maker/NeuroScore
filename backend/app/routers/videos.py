@@ -2,16 +2,19 @@ import hashlib
 from uuid import UUID
 
 import numpy as np
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.schemas.brain import NetworkStats, VertexColorsResponse
-from app.schemas.video import UploadResponse
+from app.schemas.video import UploadResponse, VideoMetadata
 from app.services.video import (
+    compute_next_version,
     extract_metadata,
     get_video_path,
+    list_versions,
     load_metadata,
+    resolve_root_video_id,
     save_upload,
     validate_extension,
 )
@@ -30,7 +33,10 @@ MIME_MAP = {
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_video(file: UploadFile):
+async def upload_video(
+    file: UploadFile,
+    original_video_id: UUID | None = Form(default=None),
+):
     if not file.filename or validate_extension(file.filename) is None:
         raise HTTPException(
             status_code=400,
@@ -42,8 +48,17 @@ async def upload_video(file: UploadFile):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    version = 1
+    root_id: UUID | None = None
+    if original_video_id is not None:
+        root_id = resolve_root_video_id(original_video_id)
+        version = compute_next_version(root_id)
+
     try:
-        metadata = extract_metadata(video_path, video_id, file.filename, ext)
+        metadata = extract_metadata(
+            video_path, video_id, file.filename, ext,
+            version=version, original_video_id=root_id,
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -56,6 +71,14 @@ async def get_metadata(video_id: UUID):
     if metadata is None:
         raise HTTPException(status_code=404, detail="Video not found")
     return metadata
+
+
+@router.get("/{video_id}/versions", response_model=list[VideoMetadata])
+async def get_video_versions(video_id: UUID):
+    meta = load_metadata(video_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return list_versions(video_id)
 
 
 @router.get("/{video_id}/file")
