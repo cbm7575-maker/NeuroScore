@@ -12,6 +12,9 @@ env/
 # Backend uploads
 backend/uploads/
 
+# Generated data files (rebuilt from nilearn atlas on first run)
+backend/app/data/*.npy
+
 # Node
 node_modules/
 .next/

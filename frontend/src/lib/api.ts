@@ -15,6 +15,49 @@ export interface UploadResponse {
   video: VideoMetadata;
 }
 
+export type NichePreset = "default" | "comedy" | "education" | "fitness" | "custom";
+
+export interface NicheWeights {
+  auditory: number;
+  language: number;
+  visual: number;
+  default_mode: number;
+  motion: number;
+}
+
+export interface NetworkScores {
+  auditory: number;
+  language: number;
+  visual: number;
+  default_mode: number;
+  motion: number;
+}
+
+export interface CompositeScoreResponse {
+  composite_score: number;
+  network_scores: NetworkScores;
+  weights_used: NicheWeights;
+  preset: NichePreset;
+}
+
+export interface BrainHemisphere {
+  coords: [number, number, number][];
+  faces: [number, number, number][];
+  network_map: number[];
+}
+
+export interface BrainSurfaceData {
+  left: BrainHemisphere;
+  right: BrainHemisphere;
+}
+
+export interface VertexColorsData {
+  video_id: string;
+  duration_seconds: number;
+  network_stats: Record<string, { min: number; max: number }>;
+  activations: number[][];  // T × 5, one row per second
+}
+
 const API_BASE = "/api";
 
 export function uploadVideo(
@@ -46,6 +89,22 @@ export function uploadVideo(
     xhr.open("POST", `${API_BASE}/videos/upload`);
     xhr.send(formData);
   });
+}
+
+let _surfaceCache: BrainSurfaceData | null = null;
+
+export async function getBrainSurface(): Promise<BrainSurfaceData> {
+  if (_surfaceCache) return _surfaceCache;
+  const res = await fetch(`${API_BASE}/brain/surface`);
+  if (!res.ok) throw new Error("Failed to load brain surface");
+  _surfaceCache = await res.json();
+  return _surfaceCache!;
+}
+
+export async function getVertexColors(videoId: string): Promise<VertexColorsData> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/vertex-colors`);
+  if (!res.ok) throw new Error("Failed to load vertex colors");
+  return res.json();
 }
 
 export async function getVideoMetadata(id: string): Promise<VideoMetadata> {
@@ -174,6 +233,26 @@ export async function generateHooks(
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.detail || "Hook generation failed");
+  }
+  return res.json();
+}
+
+export async function getCompositeScore(
+  videoId: string,
+  preset: NichePreset,
+  customWeights?: NicheWeights
+): Promise<CompositeScoreResponse> {
+  const body: { preset: NichePreset; custom_weights?: NicheWeights } = { preset };
+  if (preset === "custom" && customWeights) body.custom_weights = customWeights;
+
+  const res = await fetch(`${API_BASE}/scores/${videoId}/composite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to calculate score");
   }
   return res.json();
 }

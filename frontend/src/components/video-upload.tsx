@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { uploadVideo, type VideoMetadata } from "@/lib/api";
+import NicheSelector from "./niche-selector";
 
 const ALLOWED_EXTENSIONS = new Set(["mp4", "mov", "webm", "avi"]);
 
@@ -155,35 +156,38 @@ export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
 
       {/* Metadata display */}
       {metadata && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-[var(--success)]" />
-            <span className="text-sm font-medium text-[var(--success)]">
-              Upload complete
-            </span>
+        <>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-[var(--success)]" />
+              <span className="text-sm font-medium text-[var(--success)]">
+                Upload complete
+              </span>
+            </div>
+            <h3 className="mb-4 truncate text-lg font-medium">
+              {metadata.original_filename}
+            </h3>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <MetadataItem
+                label="Duration"
+                value={formatDuration(metadata.duration_seconds)}
+              />
+              <MetadataItem
+                label="Resolution"
+                value={`${metadata.width} x ${metadata.height}`}
+              />
+              <MetadataItem
+                label="File Size"
+                value={formatBytes(metadata.file_size_bytes)}
+              />
+              <MetadataItem
+                label="Format"
+                value={metadata.format.toUpperCase()}
+              />
+            </div>
           </div>
-          <h3 className="mb-4 truncate text-lg font-medium">
-            {metadata.original_filename}
-          </h3>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetadataItem
-              label="Duration"
-              value={formatDuration(metadata.duration_seconds)}
-            />
-            <MetadataItem
-              label="Resolution"
-              value={`${metadata.width} x ${metadata.height}`}
-            />
-            <MetadataItem
-              label="File Size"
-              value={formatBytes(metadata.file_size_bytes)}
-            />
-            <MetadataItem
-              label="Format"
-              value={metadata.format.toUpperCase()}
-            />
-          </div>
-        </div>
+          <NicheSelector videoId={metadata.id} />
+        </>
       )}
     </div>
   );
