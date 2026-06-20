@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { isScriptUnlocked, getSelectedHook } from "@/lib/script-access";
 import {
@@ -9,7 +9,6 @@ import {
   type NichePreset,
   type ScriptGenerationResponse,
   type ScriptAnnotation,
-  type TimelineEntry,
 } from "@/lib/api";
 
 const NETWORK_COLORS: Record<string, string> = {
@@ -20,39 +19,187 @@ const NETWORK_COLORS: Record<string, string> = {
   default_mode: "#8b5cf6",
 };
 
-function AnnotationCard({ annotation }: { annotation: ScriptAnnotation }) {
+type TextSegment = { text: string; annotation: ScriptAnnotation | null };
+
+function buildHighlightedSegments(
+  fullText: string,
+  annotations: ScriptAnnotation[],
+  side: "original" | "improved"
+): TextSegment[] {
+  const key = side === "original" ? "original_text" : "improved_text";
+  const matches: { start: number; end: number; annotation: ScriptAnnotation }[] = [];
+
+  for (const a of annotations) {
+    const needle = a[key];
+    if (!needle) continue;
+    const idx = fullText.indexOf(needle);
+    if (idx === -1) continue;
+    matches.push({ start: idx, end: idx + needle.length, annotation: a });
+  }
+
+  matches.sort((a, b) => a.start - b.start);
+
+  const segments: TextSegment[] = [];
+  let cursor = 0;
+  for (const m of matches) {
+    if (m.start < cursor) continue;
+    if (m.start > cursor) {
+      segments.push({ text: fullText.slice(cursor, m.start), annotation: null });
+    }
+    segments.push({ text: fullText.slice(m.start, m.end), annotation: m.annotation });
+    cursor = m.end;
+  }
+  if (cursor < fullText.length) {
+    segments.push({ text: fullText.slice(cursor), annotation: null });
+  }
+  return segments;
+}
+
+function primaryNetworkColor(annotation: ScriptAnnotation): string {
+  return NETWORK_COLORS[annotation.target_networks[0]] || "#6b7280";
+}
+
+function HighlightedText({
+  segments,
+  side,
+  activeAnnotation,
+  onHoverAnnotation,
+}: {
+  segments: TextSegment[];
+  side: "original" | "improved";
+  activeAnnotation: ScriptAnnotation | null;
+  onHoverAnnotation: (a: ScriptAnnotation | null) => void;
+}) {
   return (
-    <div className="rounded-lg border border-[var(--border)] p-4 space-y-3">
-      <div className="flex flex-wrap gap-1.5">
-        {annotation.target_networks.map((net) => (
+    <>
+      {segments.map((seg, i) => {
+        if (!seg.annotation) {
+          return <span key={i}>{seg.text}</span>;
+        }
+        const color = primaryNetworkColor(seg.annotation);
+        const isActive = activeAnnotation === seg.annotation;
+        return (
           <span
-            key={net}
-            className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-            style={{ backgroundColor: NETWORK_COLORS[net] || "#6b7280" }}
+            key={i}
+            className="relative cursor-pointer rounded px-0.5 transition-all duration-150"
+            style={{
+              backgroundColor: `${color}${isActive ? "30" : "18"}`,
+              borderBottom: `2px solid ${color}`,
+              textDecoration: side === "original" ? "line-through" : "none",
+              textDecorationColor: side === "original" ? `${color}80` : undefined,
+            }}
+            onMouseEnter={() => onHoverAnnotation(seg.annotation)}
+            onMouseLeave={() => onHoverAnnotation(null)}
           >
-            {net.replace("_", " ")}
+            {seg.text}
+            {isActive && (
+              <span
+                className="absolute left-0 top-full z-10 mt-1 w-64 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-3 text-xs shadow-xl"
+                style={{ borderColor: `${color}60` }}
+              >
+                <span className="mb-1.5 flex flex-wrap gap-1">
+                  {seg.annotation.target_networks.map((net) => (
+                    <span
+                      key={net}
+                      className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
+                      style={{ backgroundColor: NETWORK_COLORS[net] || "#6b7280" }}
+                    >
+                      {net.replace("_", " ")}
+                    </span>
+                  ))}
+                </span>
+                <span className="block text-[var(--text-secondary)]">
+                  {seg.annotation.reason}
+                </span>
+              </span>
+            )}
           </span>
-        ))}
-      </div>
-      <div className="grid gap-2 text-sm sm:grid-cols-2">
-        <div>
-          <p className="mb-1 text-xs font-medium text-[var(--text-secondary)]">
-            Original
-          </p>
-          <p className="rounded bg-red-500/10 px-2 py-1 text-[var(--text-secondary)] line-through">
-            {annotation.original_text}
-          </p>
+        );
+      })}
+    </>
+  );
+}
+
+function SideBySideDisplay({
+  originalText,
+  result,
+}: {
+  originalText: string;
+  result: ScriptGenerationResponse;
+}) {
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  const [activeAnnotation, setActiveAnnotation] = useState<ScriptAnnotation | null>(null);
+
+  const handleScroll = useCallback((source: "left" | "right") => {
+    if (syncing.current) return;
+    syncing.current = true;
+    const from = source === "left" ? leftRef.current : rightRef.current;
+    const to = source === "left" ? rightRef.current : leftRef.current;
+    if (from && to) {
+      const ratio = from.scrollTop / (from.scrollHeight - from.clientHeight || 1);
+      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight || 1);
+    }
+    requestAnimationFrame(() => { syncing.current = false; });
+  }, []);
+
+  const originalSegments = buildHighlightedSegments(originalText, result.annotations, "original");
+  const improvedSegments = buildHighlightedSegments(result.improved_script, result.annotations, "improved");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Side-by-Side Comparison</h3>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(NETWORK_COLORS).map(([net, color]) => (
+            <span key={net} className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+              {net.replace("_", " ")}
+            </span>
+          ))}
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="mb-1 text-xs font-medium text-[var(--text-secondary)]">
-            Improved
-          </p>
-          <p className="rounded bg-green-500/10 px-2 py-1 text-[var(--text-primary)]">
-            {annotation.improved_text}
-          </p>
+          <p className="mb-2 text-xs font-medium text-[var(--text-secondary)]">Original Transcript</p>
+          <div
+            ref={leftRef}
+            onScroll={() => handleScroll("left")}
+            className="h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-4 text-sm leading-relaxed text-[var(--text-secondary)]"
+          >
+            <HighlightedText
+              segments={originalSegments}
+              side="original"
+              activeAnnotation={activeAnnotation}
+              onHoverAnnotation={setActiveAnnotation}
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-[var(--text-secondary)]">Improved Script</p>
+          <div
+            ref={rightRef}
+            onScroll={() => handleScroll("right")}
+            className="h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] p-4 text-sm leading-relaxed text-[var(--text-primary)]"
+          >
+            <HighlightedText
+              segments={improvedSegments}
+              side="improved"
+              activeAnnotation={activeAnnotation}
+              onHoverAnnotation={setActiveAnnotation}
+            />
+          </div>
         </div>
       </div>
-      <p className="text-xs text-[var(--text-secondary)]">{annotation.reason}</p>
+
+      {result.annotations.length > 0 && (
+        <p className="text-xs text-[var(--text-secondary)]">
+          {result.annotations.length} change{result.annotations.length !== 1 ? "s" : ""} highlighted — hover any colored segment to see the network annotation
+        </p>
+      )}
     </div>
   );
 }
@@ -208,25 +355,7 @@ export default function ScriptPage() {
 
       {result && (
         <>
-          <div>
-            <h3 className="mb-3 text-lg font-semibold">Improved Script</h3>
-            <div className="whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-relaxed text-[var(--text-primary)]">
-              {result.improved_script}
-            </div>
-          </div>
-
-          {result.annotations.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-lg font-semibold">
-                Changes ({result.annotations.length})
-              </h3>
-              <div className="space-y-3">
-                {result.annotations.map((a, i) => (
-                  <AnnotationCard key={i} annotation={a} />
-                ))}
-              </div>
-            </div>
-          )}
+          <SideBySideDisplay originalText={transcript} result={result} />
 
           <div className="flex gap-3">
             <button

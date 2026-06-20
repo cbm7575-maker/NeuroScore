@@ -187,7 +187,7 @@ export default function VideoUpload({ onUploadComplete }: VideoUploadProps) {
               />
             </div>
           </div>
-          <NicheSelector videoId={metadata.id} />
+          <NicheSelector onChange={() => {}} />
         </>
       )}
     </div>
