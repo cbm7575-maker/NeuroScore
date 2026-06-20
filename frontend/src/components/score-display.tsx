@@ -12,6 +12,7 @@ import {
   type ComparisonOutput,
   type DropOffEvent,
   type NetworkScore,
+  type TimelinePoint,
 } from "@/lib/api";
 import CompositeScore from "./composite-score";
 import NetworkScoreCard from "./network-score-card";
@@ -65,6 +66,7 @@ export default function ScoreDisplay({
   const [pipelineStage, setPipelineStage] = useState<PipelineStage>(null);
   const [v1Scores, setV1Scores] = useState<NetworkScore[] | null>(null);
   const [v1DropOffs, setV1DropOffs] = useState<DropOffEvent[] | null>(null);
+  const [v1Timeline, setV1Timeline] = useState<TimelinePoint[] | null>(null);
   const [comparison, setComparison] = useState<ComparisonOutput | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
@@ -130,6 +132,7 @@ export default function ScoreDisplay({
         if (!cancelled) {
           setV1Scores(v1Analysis.network_scores);
           setV1DropOffs(v1Analysis.drop_offs || []);
+          setV1Timeline(v1Analysis.timeline || []);
         }
 
         setComparisonLoading(true);
@@ -247,6 +250,7 @@ export default function ScoreDisplay({
                 spikes={result.spikes || []}
                 dropOffs={result.drop_offs || []}
                 v1DropOffs={v1DropOffs}
+                v1Timeline={v1Timeline}
               />
             </div>
           )}
