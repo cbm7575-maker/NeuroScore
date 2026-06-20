@@ -7,6 +7,10 @@ import numpy as np
 from app.config import settings
 from app.schemas.analysis import (
     AnalysisOutput,
+    ComparisonFixedIssue,
+    ComparisonNetworkDelta,
+    ComparisonOutput,
+    ComparisonPersistentIssue,
     DropOffDetail,
     DropOffEvent,
     NetworkInterpretation,
@@ -284,3 +288,150 @@ def load_analysis(video_id: UUID) -> dict | None:
     if not analysis_path.exists():
         return None
     return json.loads(analysis_path.read_text())
+
+
+def build_comparison_prompt(
+    v1_scores: list[dict],
+    v2_scores: list[dict],
+    v1_drop_offs: list[dict],
+    v2_drop_offs: list[dict],
+) -> str:
+    v1_text = "\n".join(
+        f"  - {s['name']}: {s['score']}/100 ({s['label']})" for s in v1_scores
+    )
+    v2_text = "\n".join(
+        f"  - {s['name']}: {s['score']}/100 ({s['label']})" for s in v2_scores
+    )
+    delta_text = "\n".join(
+        f"  - {s2['name']}: {s1['score']} → {s2['score']} ({'+' if s2['score'] - s1['score'] > 0 else ''}{round(s2['score'] - s1['score'], 1)})"
+        for s1, s2 in zip(v1_scores, v2_scores)
+    )
+
+    v1_drops_text = "None"
+    if v1_drop_offs:
+        v1_drops_text = "\n".join(
+            f"  - t={int(d['timestamp'])}s: {d['network']} dropped to {d['score']} for {d['duration']}s"
+            for d in v1_drop_offs[:15]
+        )
+
+    v2_drops_text = "None"
+    if v2_drop_offs:
+        v2_drops_text = "\n".join(
+            f"  - t={int(d['timestamp'])}s: {d['network']} dropped to {d['score']} for {d['duration']}s"
+            for d in v2_drop_offs[:15]
+        )
+
+    return f"""Compare the neural engagement between the original video (v1) and the re-uploaded improved version (v2).
+
+## V1 Network Scores
+{v1_text}
+
+## V2 Network Scores
+{v2_text}
+
+## Score Deltas (v1 → v2)
+{delta_text}
+
+## V1 Drop-Off Events
+{v1_drops_text}
+
+## V2 Drop-Off Events
+{v2_drops_text}
+
+Respond with a JSON object containing exactly these keys:
+
+1. "summary": A 2-3 sentence overall comparison summarizing what changed between versions and whether the re-shoot improved neural engagement.
+
+2. "improvements": An array of objects for each network that improved (delta > 0), each with:
+   - "network": network name
+   - "v1_score": original score
+   - "v2_score": new score
+   - "delta": the change (positive number)
+   - "commentary": 1-2 sentences explaining what likely improved and why
+
+3. "regressions": An array of objects for each network that regressed (delta < 0), same schema as improvements but delta is negative. Include commentary on what may have caused the regression.
+
+4. "fixed_issues": An array of objects for v1 drop-offs that no longer appear in v2, each with:
+   - "timestamp": the original drop-off timestamp
+   - "network": which network
+   - "description": 1 sentence on what was fixed
+
+5. "persistent_issues": An array of objects for v1 drop-offs that still appear in v2 (overlapping time and network), each with:
+   - "timestamp": the drop-off timestamp
+   - "network": which network
+   - "description": 1 sentence on why this may persist and what to try
+
+6. "recommendations": An array of 2-4 strings, each a specific actionable recommendation for the next iteration based on the comparison.
+
+Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON."""
+
+
+def parse_comparison_response(response_text: str) -> ComparisonOutput:
+    text = response_text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = lines[1:] if lines[0].startswith("```") else lines
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines)
+
+    data = json.loads(text)
+
+    return ComparisonOutput(
+        summary=data.get("summary", ""),
+        improvements=[
+            ComparisonNetworkDelta(**item) for item in data.get("improvements", [])
+        ],
+        regressions=[
+            ComparisonNetworkDelta(**item) for item in data.get("regressions", [])
+        ],
+        fixed_issues=[
+            ComparisonFixedIssue(**item) for item in data.get("fixed_issues", [])
+        ],
+        persistent_issues=[
+            ComparisonPersistentIssue(**item)
+            for item in data.get("persistent_issues", [])
+        ],
+        recommendations=data.get("recommendations", []),
+    )
+
+
+async def generate_comparison(video_id: UUID, original_video_id: UUID) -> ComparisonOutput | None:
+    v2_data = load_analysis(video_id)
+    v1_data = load_analysis(original_video_id)
+    if v2_data is None or v1_data is None:
+        return None
+
+    prompt = build_comparison_prompt(
+        v1_scores=v1_data["network_scores"],
+        v2_scores=v2_data["network_scores"],
+        v1_drop_offs=v1_data.get("drop_offs", []),
+        v2_drop_offs=v2_data.get("drop_offs", []),
+    )
+
+    logger.info("Calling LLM for comparison of video %s vs %s", video_id, original_video_id)
+    response_text = await llm_client.generate(prompt)
+    comparison = parse_comparison_response(response_text)
+
+    output_dir = settings.upload_dir / str(video_id)
+    comparison_path = output_dir / "comparison.json"
+    comparison_path.write_text(
+        json.dumps(
+            {
+                "video_id": str(video_id),
+                "original_video_id": str(original_video_id),
+                "comparison": comparison.model_dump(),
+            },
+            indent=2,
+        )
+    )
+
+    logger.info("Comparison complete for video %s", video_id)
+    return comparison
+
+
+def load_comparison(video_id: UUID) -> dict | None:
+    comparison_path = settings.upload_dir / str(video_id) / "comparison.json"
+    if not comparison_path.exists():
+        return None
+    return json.loads(comparison_path.read_text())

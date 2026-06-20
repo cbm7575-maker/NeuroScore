@@ -5,15 +5,18 @@ import {
   getAnalysis,
   getVideoMetadata,
   runAnalysis,
+  runComparison,
   runInference,
   pollInferenceUntilComplete,
   type AnalysisResponse,
+  type ComparisonOutput,
   type DropOffEvent,
   type NetworkScore,
 } from "@/lib/api";
 import CompositeScore from "./composite-score";
 import NetworkScoreCard from "./network-score-card";
 import AnalysisDisplay from "./analysis-display";
+import ComparisonDisplay from "./comparison-display";
 import NicheSelector, { type NicheWeights } from "./niche-selector";
 import BrainVideoSync, { type BrainVideoSyncHandle } from "./brain-video-sync";
 
@@ -62,6 +65,8 @@ export default function ScoreDisplay({
   const [pipelineStage, setPipelineStage] = useState<PipelineStage>(null);
   const [v1Scores, setV1Scores] = useState<NetworkScore[] | null>(null);
   const [v1DropOffs, setV1DropOffs] = useState<DropOffEvent[] | null>(null);
+  const [comparison, setComparison] = useState<ComparisonOutput | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
   const autoAnalyzedRef = useRef(false);
 
@@ -125,6 +130,14 @@ export default function ScoreDisplay({
         if (!cancelled) {
           setV1Scores(v1Analysis.network_scores);
           setV1DropOffs(v1Analysis.drop_offs || []);
+        }
+
+        setComparisonLoading(true);
+        try {
+          const compRes = await runComparison(videoId);
+          if (!cancelled) setComparison(compRes.comparison);
+        } finally {
+          if (!cancelled) setComparisonLoading(false);
         }
       } catch {
         // v1 analysis may not exist
@@ -248,6 +261,25 @@ export default function ScoreDisplay({
               onTimestampClick={handleTimestampClick}
             />
           </div>
+
+          {/* Comparison Commentary */}
+          {(comparison || comparisonLoading) && (
+            <div className="border-t border-[var(--border)] pt-6">
+              <h2 className="mb-4 text-2xl font-semibold tracking-tight">
+                Version Comparison
+              </h2>
+              {comparisonLoading ? (
+                <div className="flex flex-col items-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--bg-tertiary)] border-t-[var(--accent)]" />
+                  <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                    Generating comparison commentary...
+                  </p>
+                </div>
+              ) : (
+                comparison && <ComparisonDisplay comparison={comparison} />
+              )}
+            </div>
+          )}
 
           {/* Funnel actions */}
           <div className="border-t border-[var(--border)] pt-6">

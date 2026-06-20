@@ -261,6 +261,53 @@ export async function getAnalysis(videoId: string): Promise<AnalysisResponse> {
   return res.json();
 }
 
+export async function runComparison(videoId: string): Promise<ComparisonResponse> {
+  const res = await fetch(`${API_BASE}/analysis/${videoId}/comparison`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || "Comparison generation failed");
+  }
+  return res.json();
+}
+
+export interface ComparisonNetworkDelta {
+  network: string;
+  v1_score: number;
+  v2_score: number;
+  delta: number;
+  commentary: string;
+}
+
+export interface ComparisonFixedIssue {
+  timestamp: number;
+  network: string;
+  description: string;
+}
+
+export interface ComparisonPersistentIssue {
+  timestamp: number;
+  network: string;
+  description: string;
+}
+
+export interface ComparisonOutput {
+  summary: string;
+  improvements: ComparisonNetworkDelta[];
+  regressions: ComparisonNetworkDelta[];
+  fixed_issues: ComparisonFixedIssue[];
+  persistent_issues: ComparisonPersistentIssue[];
+  recommendations: string[];
+}
+
+export interface ComparisonResponse {
+  success: boolean;
+  video_id: string;
+  original_video_id: string;
+  comparison: ComparisonOutput;
+}
+
 export interface HookOption {
   hook_text: string;
   target_networks: string[];

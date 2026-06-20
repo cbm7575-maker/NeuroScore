@@ -73,6 +73,42 @@ class AnalysisResponse(BaseModel):
     drop_offs: list[DropOffEvent] = []
 
 
+class ComparisonNetworkDelta(BaseModel):
+    network: str
+    v1_score: float
+    v2_score: float
+    delta: float
+    commentary: str
+
+
+class ComparisonFixedIssue(BaseModel):
+    timestamp: float
+    network: str
+    description: str
+
+
+class ComparisonPersistentIssue(BaseModel):
+    timestamp: float
+    network: str
+    description: str
+
+
+class ComparisonOutput(BaseModel):
+    summary: str
+    improvements: list[ComparisonNetworkDelta]
+    regressions: list[ComparisonNetworkDelta]
+    fixed_issues: list[ComparisonFixedIssue]
+    persistent_issues: list[ComparisonPersistentIssue]
+    recommendations: list[str]
+
+
+class ComparisonResponse(BaseModel):
+    success: bool
+    video_id: str
+    original_video_id: str
+    comparison: ComparisonOutput
+
+
 class HookOption(BaseModel):
     hook_text: str
     target_networks: list[str]
