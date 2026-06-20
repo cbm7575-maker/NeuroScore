@@ -4,6 +4,7 @@ interface NetworkScoreCardProps {
   name: string;
   score: number;
   label: string;
+  delta?: number | null;
 }
 
 const NETWORK_ICONS: Record<string, string> = {
@@ -39,6 +40,7 @@ export default function NetworkScoreCard({
   name,
   score,
   label,
+  delta,
 }: NetworkScoreCardProps) {
   const color = getScoreColor(score);
   const icon = NETWORK_ICONS[name] ?? "🔬";
@@ -80,7 +82,17 @@ export default function NetworkScoreCard({
         />
       </div>
 
-      <p className="text-xs text-[var(--text-secondary)]">{label}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-[var(--text-secondary)]">{label}</p>
+        {delta != null && Math.round(delta) !== 0 && (
+          <span
+            className="text-xs font-semibold tabular-nums"
+            style={{ color: delta > 0 ? "var(--success)" : "var(--error)" }}
+          >
+            {delta > 0 ? "▲" : "▼"} {delta > 0 ? "+" : ""}{Math.round(delta)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 interface CompositeScoreProps {
   score: number;
   label: string;
+  delta?: number | null;
 }
 
 function getScoreColor(score: number): string {
@@ -21,7 +22,7 @@ function getScoreLabel(score: number): string {
   return "Poor";
 }
 
-export default function CompositeScore({ score, label }: CompositeScoreProps) {
+export default function CompositeScore({ score, label, delta }: CompositeScoreProps) {
   const color = getScoreColor(score);
   const qualityLabel = getScoreLabel(score);
   const rounded = Math.round(score);
@@ -69,6 +70,20 @@ export default function CompositeScore({ score, label }: CompositeScoreProps) {
           <span className="text-xs text-[var(--text-secondary)]">/ 100</span>
         </div>
       </div>
+      {delta != null && Math.round(delta) !== 0 && (
+        <div
+          className="flex items-center gap-1 rounded-full px-3 py-1"
+          style={{
+            backgroundColor: delta > 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+            color: delta > 0 ? "var(--success)" : "var(--error)",
+          }}
+        >
+          <span className="text-xs">{delta > 0 ? "▲" : "▼"}</span>
+          <span className="text-xs font-semibold tabular-nums">
+            {delta > 0 ? "+" : ""}{Math.round(delta)} vs original
+          </span>
+        </div>
+      )}
       <div className="text-center">
         <p className="text-sm font-medium" style={{ color }}>
           {qualityLabel}

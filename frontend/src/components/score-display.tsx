@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  getAnalysis,
+  getVideoMetadata,
   runAnalysis,
   runInference,
   pollInferenceUntilComplete,
@@ -57,6 +59,7 @@ export default function ScoreDisplay({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [pipelineStage, setPipelineStage] = useState<PipelineStage>(null);
+  const [v1Scores, setV1Scores] = useState<NetworkScore[] | null>(null);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
   const autoAnalyzedRef = useRef(false);
 
@@ -109,9 +112,41 @@ export default function ScoreDisplay({
     [analyze, result]
   );
 
+  useEffect(() => {
+    if (!result) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const meta = await getVideoMetadata(videoId);
+        if (cancelled || !meta.original_video_id) return;
+        const v1Analysis = await getAnalysis(meta.original_video_id);
+        if (!cancelled) setV1Scores(v1Analysis.network_scores);
+      } catch {
+        // v1 analysis may not exist
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [result, videoId]);
+
   const composite = result
     ? computeWeightedComposite(result.network_scores, currentWeights)
     : 0;
+
+  const compositeDelta = useMemo(() => {
+    if (!result || !v1Scores) return null;
+    const v1Composite = computeWeightedComposite(v1Scores, currentWeights);
+    return composite - v1Composite;
+  }, [composite, v1Scores, currentWeights, result]);
+
+  const networkDeltas = useMemo(() => {
+    if (!result || !v1Scores) return null;
+    const map: Record<string, number> = {};
+    for (const v2 of result.network_scores) {
+      const v1 = v1Scores.find((s) => s.name === v2.name);
+      if (v1) map[v2.name] = v2.score - v1.score;
+    }
+    return map;
+  }, [result, v1Scores]);
 
   return (
     <div className="space-y-6">
@@ -159,6 +194,7 @@ export default function ScoreDisplay({
             <CompositeScore
               score={composite}
               label={result.analysis.overall_assessment.slice(0, 80)}
+              delta={compositeDelta}
             />
           </div>
 
@@ -174,6 +210,7 @@ export default function ScoreDisplay({
                   name={ns.name}
                   score={ns.score}
                   label={ns.label}
+                  delta={networkDeltas?.[ns.name]}
                 />
               ))}
             </div>
