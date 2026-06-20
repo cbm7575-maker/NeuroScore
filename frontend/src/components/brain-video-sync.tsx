@@ -32,10 +32,11 @@ interface BrainVideoSyncProps {
   timeline: TimelinePoint[];
   spikes: SpikeEvent[];
   dropOffs: DropOffEvent[];
+  v1DropOffs?: DropOffEvent[] | null;
 }
 
 const BrainVideoSync = forwardRef<BrainVideoSyncHandle, BrainVideoSyncProps>(
-  function BrainVideoSync({ videoId, timeline, spikes, dropOffs }, ref) {
+  function BrainVideoSync({ videoId, timeline, spikes, dropOffs, v1DropOffs }, ref) {
     const playerRef = useRef<VideoPlayerHandle>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -126,6 +127,7 @@ const BrainVideoSync = forwardRef<BrainVideoSyncHandle, BrainVideoSyncProps>(
           timeline={timeline}
           spikes={spikes}
           dropOffs={dropOffs}
+          v1DropOffs={v1DropOffs}
           currentTime={currentTime}
         />
       </div>

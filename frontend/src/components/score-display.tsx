@@ -8,6 +8,7 @@ import {
   runInference,
   pollInferenceUntilComplete,
   type AnalysisResponse,
+  type DropOffEvent,
   type NetworkScore,
 } from "@/lib/api";
 import CompositeScore from "./composite-score";
@@ -60,6 +61,7 @@ export default function ScoreDisplay({
   const [result, setResult] = useState<AnalysisResponse | null>(null);
   const [pipelineStage, setPipelineStage] = useState<PipelineStage>(null);
   const [v1Scores, setV1Scores] = useState<NetworkScore[] | null>(null);
+  const [v1DropOffs, setV1DropOffs] = useState<DropOffEvent[] | null>(null);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
   const autoAnalyzedRef = useRef(false);
 
@@ -120,7 +122,10 @@ export default function ScoreDisplay({
         const meta = await getVideoMetadata(videoId);
         if (cancelled || !meta.original_video_id) return;
         const v1Analysis = await getAnalysis(meta.original_video_id);
-        if (!cancelled) setV1Scores(v1Analysis.network_scores);
+        if (!cancelled) {
+          setV1Scores(v1Analysis.network_scores);
+          setV1DropOffs(v1Analysis.drop_offs || []);
+        }
       } catch {
         // v1 analysis may not exist
       }
@@ -228,6 +233,7 @@ export default function ScoreDisplay({
                 timeline={result.timeline}
                 spikes={result.spikes || []}
                 dropOffs={result.drop_offs || []}
+                v1DropOffs={v1DropOffs}
               />
             </div>
           )}

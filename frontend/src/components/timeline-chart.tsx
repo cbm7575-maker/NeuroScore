@@ -31,10 +31,18 @@ const NETWORK_ICONS: Record<string, string> = {
   "Default Mode": "🧠",
 };
 
+interface V1DropOffOverlay {
+  timestamp: number;
+  duration: number;
+  network: string;
+  fixed: boolean;
+}
+
 interface TimelineChartProps {
   timeline: TimelinePoint[];
   spikes: SpikeEvent[];
   dropOffs: DropOffEvent[];
+  v1DropOffs?: DropOffEvent[] | null;
   currentTime?: number;
 }
 
@@ -100,10 +108,31 @@ function CustomLegend({
   );
 }
 
+function classifyV1DropOffs(
+  v1Drops: DropOffEvent[],
+  v2Drops: DropOffEvent[]
+): V1DropOffOverlay[] {
+  return v1Drops.map((v1) => {
+    const persists = v2Drops.some(
+      (v2) =>
+        v2.network === v1.network &&
+        v2.timestamp < v1.timestamp + v1.duration &&
+        v2.timestamp + v2.duration > v1.timestamp
+    );
+    return {
+      timestamp: v1.timestamp,
+      duration: v1.duration,
+      network: v1.network,
+      fixed: !persists,
+    };
+  });
+}
+
 export default function TimelineChart({
   timeline,
   spikes,
   dropOffs,
+  v1DropOffs,
   currentTime,
 }: TimelineChartProps) {
   const chartData = useMemo<ChartDataPoint[]>(() => {
@@ -118,15 +147,34 @@ export default function TimelineChart({
     return Object.keys(timeline[0].scores);
   }, [timeline]);
 
+  const v1Overlays = useMemo(() => {
+    if (!v1DropOffs || v1DropOffs.length === 0) return [];
+    return classifyV1DropOffs(v1DropOffs, dropOffs);
+  }, [v1DropOffs, dropOffs]);
+
   if (timeline.length === 0) return null;
 
   const maxTime = timeline[timeline.length - 1].timestamp;
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-      <h3 className="mb-4 text-sm font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-        Network Activation Timeline
-      </h3>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+          Network Activation Timeline
+        </h3>
+        {v1Overlays.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-4 rounded-sm border border-dashed" style={{ borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,0.15)" }} />
+              <span className="text-xs text-[var(--text-secondary)]">Fixed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-4 rounded-sm border border-dashed" style={{ borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.15)" }} />
+              <span className="text-xs text-[var(--text-secondary)]">Persists</span>
+            </div>
+          </div>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={360}>
         <LineChart
           data={chartData}
@@ -154,7 +202,23 @@ export default function TimelineChart({
           <Tooltip content={<CustomTooltip />} />
           <Legend content={<CustomLegend />} />
 
-          {/* Drop-off zones */}
+          {/* v1 drop-off overlay zones (fixed = green, persists = amber) */}
+          {v1Overlays.map((d, i) => (
+            <ReferenceArea
+              key={`v1-drop-${i}`}
+              x1={d.timestamp}
+              x2={d.timestamp + d.duration}
+              y1={0}
+              y2={100}
+              fill={d.fixed ? "#22c55e" : "#f59e0b"}
+              fillOpacity={0.1}
+              stroke={d.fixed ? "#22c55e" : "#f59e0b"}
+              strokeOpacity={0.35}
+              strokeDasharray="6 3"
+            />
+          ))}
+
+          {/* v2 drop-off zones */}
           {dropOffs.map((d, i) => (
             <ReferenceArea
               key={`drop-${i}`}
