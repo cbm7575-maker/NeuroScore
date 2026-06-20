@@ -326,3 +326,50 @@ export async function generateScript(
   }
   return res.json();
 }
+
+export interface InferenceJob {
+  job_id: string;
+  video_id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  error?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export async function runInference(videoId: string): Promise<InferenceJob> {
+  const res = await fetch(`${API_BASE}/inference/${videoId}`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to start inference");
+  }
+  return res.json();
+}
+
+export async function getInferenceStatus(videoId: string): Promise<InferenceJob> {
+  const res = await fetch(`${API_BASE}/inference/${videoId}/status`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to check inference status");
+  }
+  return res.json();
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function pollInferenceUntilComplete(
+  videoId: string,
+  intervalMs = 2000,
+  maxAttempts = 150
+): Promise<InferenceJob> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const status = await getInferenceStatus(videoId);
+    if (status.status === "completed") return status;
+    if (status.status === "failed")
+      throw new Error(status.error || "Inference failed");
+    await delay(intervalMs);
+  }
+  throw new Error("Inference timed out");
+}

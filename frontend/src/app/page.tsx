@@ -17,6 +17,7 @@ export default function Home() {
   const [showReupload, setShowReupload] = useState(false);
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const [niche, setNiche] = useState<NichePreset>("default");
+  const [autoAnalyze, setAutoAnalyze] = useState(false);
 
   const handleGenerateHooks = () => {
     setActiveTab("hooks");
@@ -41,6 +42,7 @@ export default function Home() {
     setShowReupload(false);
     setAnalysisResult(null);
     setSelectedHook(null);
+    setAutoAnalyze(true);
   };
 
   const handleCancelReupload = () => {
@@ -74,10 +76,15 @@ export default function Home() {
                 Neural Engagement Scores
               </h2>
               <ScoreDisplay
+                key={videoId}
                 videoId={videoId}
+                autoAnalyze={autoAnalyze}
                 onGenerateHooks={handleGenerateHooks}
                 onReupload={handleReupload}
-                onAnalysisComplete={setAnalysisResult}
+                onAnalysisComplete={(res) => {
+                  setAnalysisResult(res);
+                  setAutoAnalyze(false);
+                }}
                 onNicheChange={(n) => setNiche(n as NichePreset)}
               />
             </div>

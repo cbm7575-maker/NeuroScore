@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { runAnalysis, type AnalysisResponse, type NetworkScore } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  runAnalysis,
+  runInference,
+  pollInferenceUntilComplete,
+  type AnalysisResponse,
+  type NetworkScore,
+} from "@/lib/api";
 import CompositeScore from "./composite-score";
 import NetworkScoreCard from "./network-score-card";
 import AnalysisDisplay from "./analysis-display";
@@ -24,8 +30,11 @@ function computeWeightedComposite(
   return totalWeight > 0 ? weighted / totalWeight : 0;
 }
 
+type PipelineStage = "inference" | "analysis" | null;
+
 interface ScoreDisplayProps {
   videoId: string;
+  autoAnalyze?: boolean;
   onGenerateHooks?: () => void;
   onReupload?: () => void;
   onAnalysisComplete?: (result: AnalysisResponse) => void;
@@ -34,6 +43,7 @@ interface ScoreDisplayProps {
 
 export default function ScoreDisplay({
   videoId,
+  autoAnalyze = false,
   onGenerateHooks,
   onReupload,
   onAnalysisComplete,
@@ -46,7 +56,9 @@ export default function ScoreDisplay({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>(null);
   const syncRef = useRef<BrainVideoSyncHandle>(null);
+  const autoAnalyzedRef = useRef(false);
 
   const handleTimestampClick = useCallback((time: number) => {
     syncRef.current?.seekTo(time);
@@ -57,6 +69,13 @@ export default function ScoreDisplay({
       setError(null);
       setLoading(true);
       try {
+        setPipelineStage("inference");
+        const job = await runInference(videoId);
+        if (job.status !== "completed") {
+          await pollInferenceUntilComplete(videoId);
+        }
+
+        setPipelineStage("analysis");
         const res = await runAnalysis(videoId, niche);
         setResult(res);
         onAnalysisComplete?.(res);
@@ -64,10 +83,18 @@ export default function ScoreDisplay({
         setError(e instanceof Error ? e.message : "Analysis failed");
       } finally {
         setLoading(false);
+        setPipelineStage(null);
       }
     },
-    [videoId]
+    [videoId, onAnalysisComplete]
   );
+
+  useEffect(() => {
+    if (autoAnalyze && !autoAnalyzedRef.current) {
+      autoAnalyzedRef.current = true;
+      analyze(currentNiche);
+    }
+  }, [autoAnalyze, analyze, currentNiche]);
 
   const handleNicheChange = useCallback(
     (apiNiche: string, weights: NicheWeights) => {
@@ -114,7 +141,9 @@ export default function ScoreDisplay({
         <div className="flex flex-col items-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--bg-tertiary)] border-t-[var(--accent)]" />
           <p className="mt-4 text-sm text-[var(--text-secondary)]">
-            Running neural engagement analysis...
+            {pipelineStage === "inference"
+              ? "Running neural inference (TRIBE v2)..."
+              : "Running neural engagement analysis..."}
           </p>
         </div>
       )}
