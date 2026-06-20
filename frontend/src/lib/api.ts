@@ -77,6 +77,13 @@ export interface TimelineEntry {
   affected_networks: string[];
 }
 
+export interface TimelineResult {
+  video_id: string;
+  duration_seconds: number;
+  thresholds: { spike_sd_above: number; drop_sd_below: number; drop_min_duration_seconds: number };
+  timeline: TimelineEntry[];
+}
+
 export interface ScriptAnnotation {
   original_text: string;
   improved_text: string;
@@ -294,13 +301,6 @@ export async function getCompositeScore(
     throw new Error(err.detail || "Failed to calculate score");
   }
   return res.json();
-}
-
-export interface TimelineResult {
-  video_id: string;
-  duration_seconds: number;
-  thresholds: { spike_sd_above: number; drop_sd_below: number; drop_min_duration_seconds: number };
-  timeline: TimelineEntry[];
 }
 
 export async function getTimeline(videoId: string): Promise<TimelineResult> {

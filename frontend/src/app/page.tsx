@@ -5,7 +5,8 @@ import VideoUpload from "@/components/video-upload";
 import ScoreDisplay from "@/components/score-display";
 import TabNavigation, { type TabId } from "@/components/tab-navigation";
 import HooksTab from "@/components/hooks-tab";
-import type { AnalysisResponse } from "@/lib/api";
+import ScriptTab from "@/components/script-tab";
+import type { AnalysisResponse, NichePreset } from "@/lib/api";
 
 export default function Home() {
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export default function Home() {
   );
   const [showReupload, setShowReupload] = useState(false);
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
-  const [niche, setNiche] = useState("general");
+  const [niche, setNiche] = useState<NichePreset>("default");
 
   const handleGenerateHooks = () => {
     setActiveTab("hooks");
@@ -24,6 +25,11 @@ export default function Home() {
   const handleGenerateScript = (hookText: string) => {
     setSelectedHook(hookText);
     setActiveTab("script");
+  };
+
+  const handleNavigateToAnalysis = () => {
+    setActiveTab("analysis");
+    setShowReupload(true);
   };
 
   const handleReupload = () => {
@@ -72,7 +78,7 @@ export default function Home() {
                 onGenerateHooks={handleGenerateHooks}
                 onReupload={handleReupload}
                 onAnalysisComplete={setAnalysisResult}
-                onNicheChange={setNiche}
+                onNicheChange={(n) => setNiche(n as NichePreset)}
               />
             </div>
           )}
@@ -113,31 +119,13 @@ export default function Home() {
         />
       )}
 
-      {activeTab === "script" && selectedHook && (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Generate Script
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Generating a full script from your selected hook
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-              Selected Hook
-            </h3>
-            <p className="text-sm leading-relaxed text-[var(--text-primary)]">
-              {selectedHook}
-            </p>
-          </div>
-          <div className="flex flex-col items-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--bg-tertiary)] border-t-[var(--accent)]" />
-            <p className="mt-4 text-sm text-[var(--text-secondary)]">
-              Generating script...
-            </p>
-          </div>
-        </div>
+      {activeTab === "script" && selectedHook && videoId && (
+        <ScriptTab
+          videoId={videoId}
+          selectedHook={selectedHook}
+          niche={niche}
+          onNavigateToAnalysis={handleNavigateToAnalysis}
+        />
       )}
     </div>
   );
